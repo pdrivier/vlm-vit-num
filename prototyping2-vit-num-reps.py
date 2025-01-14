@@ -74,11 +74,13 @@ imagepair_ix_list = [item for sublist in imagepair_ix_list for item in sublist]
 ## Create list of image names for the corresponding images
 list_of_imagepair_names = [("stimulus_"+str(i[0])+".png","stimulus_"+str(i[1])+".png") for i in imagepair_ix_list]
 
+## Set up results-gathering variable
+gather_df = []
+
 ## Load your processor and model
 processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224-in21k')
 model = ViTModel.from_pretrained('google/vit-base-patch16-224-in21k')
 
-gather_df = []
 for pair in tqdm(list_of_imagepair_names): 
 
 	## Grab metadata for each image in the pair
@@ -108,9 +110,7 @@ for pair in tqdm(list_of_imagepair_names):
 	## Grab the CLS representation for the image (token index 0)
 	imfeats = {}
 	for image_name in pair: 
-	
 		image = Image.open(os.path.join(dpath,image_name)).convert("RGB")
-
 		# Encode image
 		inputs = processor(images=image, return_tensors="pt")
 		with torch.no_grad():
@@ -133,8 +133,8 @@ for pair in tqdm(list_of_imagepair_names):
 		 "numerosity_1": im1_numerosity, 
 		 "numerosity_2": im2_numerosity, 
 		 "area_diff": area_diff,
-		 "area_bin": area_bin,
-		 "numerosity_comparison_type": comparison_type}
+		 "numerosity_comparison_type": comparison_type,
+		 "layer": layer}
 	gather_df.append(d)
 
 
