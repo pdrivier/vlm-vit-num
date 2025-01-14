@@ -139,6 +139,11 @@ for pair in tqdm(list_of_imagepair_names):
 
 
 cosdf = pd.DataFrame(gather_df)
+savepath = "results/"
+if not os.path.exists(savepath): 
+	os.mkdir(savepath)
+cosdf.to_csv(os.path.join(savepath, "cossim_samediff_tmp.csv"))
 
+import seaborn as sns
 
 
