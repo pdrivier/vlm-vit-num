@@ -20,13 +20,13 @@ from torch.nn.functional import cosine_similarity
 import torch.nn.functional as F
 
 ##TODO: need to ensure target number of same/diff 
-def generate_random_pairs(items, num_pairs):
+def generate_random_pairs(items, n_pairs):
     # Make sure we can generate the requested number of pairs
     max_pairs = len(items) * (len(items) - 1) // 2
-    if num_pairs > max_pairs:
-        raise ValueError(f"Can't generate {num_pairs} unique pairs from {len(items)} items. Maximum possible is {max_pairs}")
+    if n_pairs > max_pairs:
+        raise ValueError(f"Can't generate {n_pairs} unique pairs from {len(items)} items. Maximum possible is {max_pairs}")
     pairs = set()
-    while len(pairs) < num_pairs:
+    while len(pairs) < n_pairs:
         # Get two random items
         a, b = sample(items, 2)
         # Add as tuple, sorting to ensure (a,b) and (b,a) are treated as same pair
@@ -52,33 +52,34 @@ labels = labels[:-1]
 metadata['cum_area_bins'] = pd.cut(metadata["cum_area"], bins=bins, labels=labels, include_lowest=True)
 _, area_bin_intervals = pd.cut(bins,10,retbins=True)
 
-## Create the list of images you'll get cosine similarity for
-k = 3 ## num of images per area bin
+## Create the list of image pairs you'll get cosine similarity for
 numerosities = list(set(metadata["numerosity"].values))
-image_ix_list = []
+imagepair_ix_list_same = []
+n_pairs = 10
 for numerosity in numerosities:
 	subnum = metadata[metadata["numerosity"] == numerosity]
-	for area_bin in labels: 
-		subarea = subnum[subnum["cum_area_bins"]==area_bin]
-		imix = random.sample(list(subarea.index.values),k)
-		image_ix_list.append(imix)
+	imagepair_ix_list_same.append(generate_random_pairs(subnum.index.tolist(),n_pairs))
 
-image_ix_list = [item for sublist in image_ix_list for item in sublist]
+imagepair_ix_list_same = [item for sublist in imagepair_ix_list_same for item in sublist]
+image_ix_list = [item for tup in imagepair_ix_list_same for item in tup]
 select_metadata = metadata[metadata.index.isin(image_ix_list)]
 
-## Create list of image names for the corresponding images
-list_of_images = ["stimulus_"+str(i)+".png" for i in image_ix_list]
+## Create list of different-numerosity image pairs
+imagepair_ix_list_diff = generate_random_pairs(image_ix_list,len(image_ix_list)/2)
 
-## Create list of image pairs
-num_pairs = 100
-image_pairs = generate_random_pairs(list_of_images, num_pairs)
+## Concatenate the list of same- and different-numerosity pairs
+imagepair_ix_list = [imagepair_ix_list_same, imagepair_ix_list_diff]
+imagepair_ix_list = [item for sublist in imagepair_ix_list for item in sublist]
+
+## Create list of image names for the corresponding images
+list_of_imagepair_names = [("stimulus_"+str(i[0])+".png","stimulus_"+str(i[1])+".png") for i in imagepair_ix_list]
 
 ## Load your processor and model
 processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224-in21k')
 model = ViTModel.from_pretrained('google/vit-base-patch16-224-in21k')
 
 gather_df = []
-for pair in tqdm(image_pairs): 
+for pair in tqdm(list_of_imagepair_names): 
 
 	## Grab metadata for each image in the pair
 	imix1 = int(pair[0].split("_")[1].split(".png")[0])
