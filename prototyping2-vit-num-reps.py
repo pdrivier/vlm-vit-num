@@ -13,7 +13,7 @@ from scipy.spatial.distance import cosine
 
 from tqdm import tqdm
 
-from transformers import ViTImageProcessor, ViTModel
+from transformers import ViTImageProcessor, ViTModel, CLIPProcessor, CLIPModel
 import torch
 from PIL import Image
 from torch.nn.functional import cosine_similarity
@@ -37,6 +37,19 @@ image_type = "rectangles"
 # dpath = "data/stimuli/{x}/".format(x=image_type)
 dpath = "../vlm-vit-num-tmp/data/stimuli/{x}/".format(x=image_type) #prototyping dpath
 metadata = pd.read_csv(os.path.join(dpath,"metadata.csv"))
+
+## Define the hugging face paths for models and corresponding image processors
+## TODO: need to find vision transformers and VLMs that lend themselves to controlled comparisons
+#  e.g. we need to control for the image patch size! this might interact with numerosity comparison 
+#  estimates!!
+MODELS = {
+    'clip-vit-base-patch32': ['openai/clip-vit-base-patch32', CLIPModel, CLIPProcessor],
+    'clip-vit-large-patch14': ['openai/clip-vit-large-patch14', CLIPModel, CLIPProcessor],
+    'clip-huge-14': ['laion/CLIP-ViT-H-14-laion2B-s32B-b79K', CLIPModel, CLIPProcessor],
+    'clip-giant': ['laion/CLIP-ViT-g-14-laion2B-s12B-b42K', CLIPModel, CLIPProcessor],
+    'clip-big-giant': ['laion/CLIP-ViT-bigG-14-laion2B-39B-b160k', CLIPModel, CLIPProcessor],
+    'vit-base-patch16-224-in21k':['google/vit-base-patch16-224-in21k',ViTModel, ViTImageProcessor]
+    }
 
 ## Sample multiple images matched for numerosity per image property (e.g. cum_area)
 min_area = metadata["cum_area"].min()
@@ -76,11 +89,6 @@ list_of_imagepair_names = [("stimulus_"+str(i[0])+".png","stimulus_"+str(i[1])+"
 
 ## Set up results-gathering variable
 gather_df = []
-
-## Load your processor and model
-processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224-in21k')
-model = ViTModel.from_pretrained('google/vit-base-patch16-224-in21k')
-
 for pair in tqdm(list_of_imagepair_names): 
 
 	## Grab metadata for each image in the pair
@@ -104,38 +112,56 @@ for pair in tqdm(list_of_imagepair_names):
 	area_diff = np.abs(im1_area-im2_area) 
 	numerosity_diff = np.abs(im1_numerosity-im2_numerosity)
 
-	##TODO: Here is where you'd want to iterate by model layer to get intermediate representations
-	layer = "last"
+	for mname, mspecs in MODELS.items(): 
 
-	## Grab the CLS representation for the image (token index 0)
-	imfeats = {}
-	for image_name in pair: 
-		image = Image.open(os.path.join(dpath,image_name)).convert("RGB")
-		# Encode image
-		inputs = processor(images=image, return_tensors="pt")
-		with torch.no_grad():
-			outputs = model(**inputs)
-			## Grab just the CLS token out of the sequence of image tokens (this is 
-			# the middle "0" index in the outputs.last_hidden_state variable)
-			imfeats[image_name] = outputs.last_hidden_state[:,0,:]
-			## TODO: another option is to mean-pool the tokens excepting the CLS
-			# imfeats[image_name] =  outputs.last_hidden_state[:,1:,:].mean(dim=1)
-			### TODO: not sure if I should normalize? 
-			# imfeats[image_name] = tmp / tmp.norm(dim=-1, keepdim=True)
+		## Load your processor and model
+	    mpath, mclass, mprocessor = mspecs
 
-	## Compute the cosine similarity of this pair
-	cos_sim = cosine_similarity(imfeats[pair[0]],imfeats[pair[1]])
+		processor = mprocessor.from_pretrained(mpath)
+		model = mclass.from_pretrained(mpath)
 
-	## Store the results and corresponding metadata
-	d = {"image_1": pair[0],
-		 "image_2": pair[1],
-		 "cosine_similarity": cos_sim.detach().numpy()[0],
-		 "numerosity_1": im1_numerosity, 
-		 "numerosity_2": im2_numerosity, 
-		 "area_diff": area_diff,
-		 "numerosity_comparison_type": comparison_type,
-		 "layer": layer}
-	gather_df.append(d)
+		##TODO: Here is where you'd want to iterate by model layer to get intermediate representations
+		if "clip" or "CLIP" in mname: 
+			nlayers = len(model.vision_model.encoder.layers)
+		else: 
+			nlayers = len(model.encoder.layer)
+
+		for layer in range(nlayers):
+
+			## Grab the CLS representation for the image (token index 0)
+			imfeats = {}
+			for image_name in pair: 
+				image = Image.open(os.path.join(dpath,image_name)).convert("RGB")
+				# Encode image
+				inputs = processor(images=image, return_tensors="pt")
+				with torch.no_grad():
+					outputs = model(**inputs)
+					## Grab just the CLS token out of the sequence of image tokens (this is 
+					# the middle "0" index in the outputs.last_hidden_state variable)
+					
+					if "clip" or "CLIP" in mname:
+						imfeats[image_name] = outputs.vision_model_output.hidden_states[layer][:,0,:]
+					else:
+						imfeats[image_name] = outputs.hidden_states[layer][:,0,:]
+					# imfeats[image_name] = outputs.last_hidden_state[:,0,:]
+					
+					### TODO: not sure if I should normalize? 
+					# imfeats[image_name] = tmp / tmp.norm(dim=-1, keepdim=True)
+
+			## Compute the cosine similarity of this pair
+			cos_sim = cosine_similarity(imfeats[pair[0]],imfeats[pair[1]])
+
+			## Store the results and corresponding metadata
+			d = {"model_name": mname,
+				 "image_1": pair[0],
+				 "image_2": pair[1],
+				 "cosine_similarity": cos_sim.detach().numpy()[0],
+				 "numerosity_1": im1_numerosity, 
+				 "numerosity_2": im2_numerosity, 
+				 "area_diff": area_diff,
+				 "numerosity_comparison_type": comparison_type,
+				 "layer": layer}
+			gather_df.append(d)
 
 
 cosdf = pd.DataFrame(gather_df)
