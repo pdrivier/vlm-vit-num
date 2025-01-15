@@ -1,4 +1,5 @@
 #tmp prototyping
+import gc #garbage collection
 import itertools
 import os 
 import random 
@@ -13,6 +14,7 @@ from scipy.spatial.distance import cosine
 
 from tqdm import tqdm
 
+from huggingface_hub import try_to_load_from_cache, scan_cache_dir
 from transformers import ViTImageProcessor, ViTModel, CLIPProcessor, CLIPModel
 import torch
 from PIL import Image
@@ -117,51 +119,66 @@ for pair in tqdm(list_of_imagepair_names):
 		## Load your processor and model
 		mpath, mclass, mprocessor = mspecs
 
-		processor = mprocessor.from_pretrained(mpath)
-		model = mclass.from_pretrained(mpath)
+		try:
+			processor = mprocessor.from_pretrained(mpath)
+			model = mclass.from_pretrained(mpath)
 
-		##TODO: Here is where you'd want to iterate by model layer to get intermediate representations
-		if "clip" in mname.lower(): 
-			nlayers = len(model.vision_model.encoder.layers)
-		else: 
-			nlayers = len(model.encoder.layer)
+			##TODO: Here is where you'd want to iterate by model layer to get intermediate representations
+			if "clip" in mname.lower(): 
+				nlayers = len(model.vision_model.encoder.layers)
+			else: 
+				nlayers = len(model.encoder.layer)
 
-		for layer in range(nlayers):
+			for layer in range(nlayers):
 
-			## Grab the CLS representation for the image (token index 0)
-			imfeats = {}
-			for image_name in pair: 
-				image = Image.open(os.path.join(dpath,image_name)).convert("RGB")
-				# Encode image
-				inputs = processor(images=image, return_tensors="pt")
-				with torch.no_grad():
-					## Grab just the CLS token out of the sequence of image tokens (this is 
-					# the middle "0" index in the outputs.last_hidden_state variables
-					if "clip" in mname.lower():
-						outputs = model.vision_model(pixel_values=inputs.pixel_values, output_hidden_states=True)
-						imfeats[image_name] = outputs.hidden_states[layer][:,0,:]
-					else:
-						outputs = model(**inputs, output_hidden_states=True)
-						imfeats[image_name] = outputs.hidden_states[layer][:,0,:]
-					
-					
-					### TODO: not sure if I should normalize? 
-					# imfeats[image_name] = tmp / tmp.norm(dim=-1, keepdim=True)
+				## Grab the CLS representation for the image (token index 0)
+				imfeats = {}
+				for image_name in pair: 
+					image = Image.open(os.path.join(dpath,image_name)).convert("RGB")
+					# Encode image
+					inputs = processor(images=image, return_tensors="pt")
+					with torch.no_grad():
+						## Grab just the CLS token out of the sequence of image tokens (this is 
+						# the middle "0" index in the outputs.last_hidden_state variables
+						if "clip" in mname.lower():
+							outputs = model.vision_model(pixel_values=inputs.pixel_values, output_hidden_states=True)
+							imfeats[image_name] = outputs.hidden_states[layer][:,0,:]
+						else:
+							outputs = model(**inputs, output_hidden_states=True)
+							imfeats[image_name] = outputs.hidden_states[layer][:,0,:]
+						
+						
+						### TODO: not sure if I should normalize? 
+						# imfeats[image_name] = tmp / tmp.norm(dim=-1, keepdim=True)
 
-			## Compute the cosine similarity of this pair
-			cos_sim = cosine_similarity(imfeats[pair[0]],imfeats[pair[1]])
+				## Compute the cosine similarity of this pair
+				cos_sim = cosine_similarity(imfeats[pair[0]],imfeats[pair[1]])
 
-			## Store the results and corresponding metadata
-			d = {"model_name": mname,
-				 "image_1": pair[0],
-				 "image_2": pair[1],
-				 "cosine_similarity": cos_sim.detach().numpy()[0],
-				 "numerosity_1": im1_numerosity, 
-				 "numerosity_2": im2_numerosity, 
-				 "area_diff": area_diff,
-				 "numerosity_comparison_type": comparison_type,
-				 "layer": layer}
-			gather_df.append(d)
+				## Store the results and corresponding metadata
+				d = {"model_name": mname,
+					 "image_1": pair[0],
+					 "image_2": pair[1],
+					 "cosine_similarity": cos_sim.detach().numpy()[0],
+					 "numerosity_1": im1_numerosity, 
+					 "numerosity_2": im2_numerosity, 
+					 "area_diff": area_diff,
+					 "numerosity_comparison_type": comparison_type,
+					 "layer": layer}
+				gather_df.append(d)
+
+			finally:
+
+				## Cleanup model files to make room in machine!
+		        if torch.cuda.is_available():
+		            torch.cuda.empty_cache()
+		        del model
+		        gc.collect()
+		        
+		        ## Clear from disk cache
+		        cached_files = scan_cache_dir()
+		        for model_info in cached_files.repos:
+		            if model_path in model_info.repo_id:
+		                model_info.delete()
 
 
 cosdf = pd.DataFrame(gather_df)
