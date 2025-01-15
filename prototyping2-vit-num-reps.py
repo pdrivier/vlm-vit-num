@@ -100,6 +100,12 @@ for mname, mspecs in MODELS.items():
 		processor = mprocessor.from_pretrained(mpath)
 		model = mclass.from_pretrained(mpath)
 
+		##TODO: Here is where you'd want to iterate by model layer to get intermediate representations
+		if "clip" in mname.lower(): 
+			nlayers = len(model.vision_model.encoder.layers)
+		else: 
+			nlayers = len(model.encoder.layer)
+
 		## Iterate through the image pairs and get layerwise cosine distances
 		for pair in tqdm(list_of_imagepair_names): 
 
@@ -123,12 +129,6 @@ for mname, mspecs in MODELS.items():
 			## Figure out what the differences in surface area and numerosity are
 			area_diff = np.abs(im1_area-im2_area) 
 			numerosity_diff = np.abs(im1_numerosity-im2_numerosity)
-
-			##TODO: Here is where you'd want to iterate by model layer to get intermediate representations
-			if "clip" in mname.lower(): 
-				nlayers = len(model.vision_model.encoder.layers)
-			else: 
-				nlayers = len(model.encoder.layer)
 
 			for layer in range(nlayers):
 
