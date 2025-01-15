@@ -45,12 +45,12 @@ metadata = pd.read_csv(os.path.join(dpath,"metadata.csv"))
 #  e.g. we need to control for the image patch size! this might interact with numerosity comparison 
 #  estimates!!
 MODELS = {
-    'clip-vit-base-patch32': ['openai/clip-vit-base-patch32', CLIPModel, CLIPProcessor],
-    'clip-vit-large-patch14': ['openai/clip-vit-large-patch14', CLIPModel, CLIPProcessor],
-    'clip-huge-14': ['laion/CLIP-ViT-H-14-laion2B-s32B-b79K', CLIPModel, CLIPProcessor],
-    'clip-giant': ['laion/CLIP-ViT-g-14-laion2B-s12B-b42K', CLIPModel, CLIPProcessor],
-    'clip-big-giant': ['laion/CLIP-ViT-bigG-14-laion2B-39B-b160k', CLIPModel, CLIPProcessor],
-    'vit-base-patch16-224-in21k':['google/vit-base-patch16-224-in21k',ViTModel, ViTImageProcessor]
+    'clip-vit-base-patch32': ['openai/clip-vit-base-patch32', CLIPModel, CLIPProcessor]#,
+    # 'clip-vit-large-patch14': ['openai/clip-vit-large-patch14', CLIPModel, CLIPProcessor],
+    # 'clip-huge-14': ['laion/CLIP-ViT-H-14-laion2B-s32B-b79K', CLIPModel, CLIPProcessor],
+    # 'clip-giant': ['laion/CLIP-ViT-g-14-laion2B-s12B-b42K', CLIPModel, CLIPProcessor],
+    # 'clip-big-giant': ['laion/CLIP-ViT-bigG-14-laion2B-39B-b160k', CLIPModel, CLIPProcessor],
+    # 'vit-base-patch16-224-in21k':['google/vit-base-patch16-224-in21k',ViTModel, ViTImageProcessor]
     }
 
 ## Sample multiple images matched for numerosity per image property (e.g. cum_area)
@@ -91,37 +91,38 @@ list_of_imagepair_names = [("stimulus_"+str(i[0])+".png","stimulus_"+str(i[1])+"
 
 ## Set up results-gathering variable
 gather_df = []
-for pair in tqdm(list_of_imagepair_names): 
+for mname, mspecs in MODELS.items(): 
 
-	## Grab metadata for each image in the pair
-	imix1 = int(pair[0].split("_")[1].split(".png")[0])
-	im1_numerosity = metadata.loc[imix1]["numerosity"]
-	im1_area = metadata.loc[imix1]["cum_area"]
-	im1_areabin = metadata.loc[imix1]["cum_area_bins"]
+	## Load your processor and model
+	mpath, mclass, mprocessor = mspecs
 
-	imix2 = int(pair[1].split("_")[1].split(".png")[0])
-	im2_numerosity = metadata.loc[imix2]["numerosity"]
-	im2_area = metadata.loc[imix2]["cum_area"]
-	im2_areabin = metadata.loc[imix2]["cum_area_bins"]
+	try:
+		processor = mprocessor.from_pretrained(mpath)
+		model = mclass.from_pretrained(mpath)
 
-	## Figure out what kind of comparison type this is
-	if (im1_numerosity - im2_numerosity == 0):
-		comparison_type = "same"
-	else:
-		comparison_type = "different"
+		## Iterate through the image pairs and get layerwise cosine distances
+		for pair in tqdm(list_of_imagepair_names): 
 
-	## Figure out what the differences in surface area and numerosity are
-	area_diff = np.abs(im1_area-im2_area) 
-	numerosity_diff = np.abs(im1_numerosity-im2_numerosity)
+			## Grab metadata for each image in the pair
+			imix1 = int(pair[0].split("_")[1].split(".png")[0])
+			im1_numerosity = metadata.loc[imix1]["numerosity"]
+			im1_area = metadata.loc[imix1]["cum_area"]
+			im1_areabin = metadata.loc[imix1]["cum_area_bins"]
 
-	for mname, mspecs in MODELS.items(): 
+			imix2 = int(pair[1].split("_")[1].split(".png")[0])
+			im2_numerosity = metadata.loc[imix2]["numerosity"]
+			im2_area = metadata.loc[imix2]["cum_area"]
+			im2_areabin = metadata.loc[imix2]["cum_area_bins"]
 
-		## Load your processor and model
-		mpath, mclass, mprocessor = mspecs
+			## Figure out what kind of comparison type this is
+			if (im1_numerosity - im2_numerosity == 0):
+				comparison_type = "same"
+			else:
+				comparison_type = "different"
 
-		try:
-			processor = mprocessor.from_pretrained(mpath)
-			model = mclass.from_pretrained(mpath)
+			## Figure out what the differences in surface area and numerosity are
+			area_diff = np.abs(im1_area-im2_area) 
+			numerosity_diff = np.abs(im1_numerosity-im2_numerosity)
 
 			##TODO: Here is where you'd want to iterate by model layer to get intermediate representations
 			if "clip" in mname.lower(): 
@@ -166,17 +167,17 @@ for pair in tqdm(list_of_imagepair_names):
 					 "layer": layer}
 				gather_df.append(d)
 
-			finally:
-				## Cleanup model files to make room in machine!
-				if torch.cuda.is_available():
-				    torch.cuda.empty_cache()
-				del model
-				gc.collect()
-				## Clear from disk cache
-				cached_files = scan_cache_dir()
-				for model_info in cached_files.repos:
-				    if model_path in model_info.repo_id:
-				        model_info.delete()
+	finally:
+		## Cleanup model files to make room in machine!
+		if torch.cuda.is_available():
+		    torch.cuda.empty_cache()
+		del model
+		gc.collect()
+		# Clear from disk cache
+		cached_files = scan_cache_dir()
+		for repo in cached_files.repos:
+		    if mpath in repo.repo_id:
+		        delete_repo_from_cache(repo.repo_id)
 
 
 cosdf = pd.DataFrame(gather_df)
