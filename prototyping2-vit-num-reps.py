@@ -167,18 +167,16 @@ for pair in tqdm(list_of_imagepair_names):
 				gather_df.append(d)
 
 			finally:
-
 				## Cleanup model files to make room in machine!
-		        if torch.cuda.is_available():
-		            torch.cuda.empty_cache()
-		        del model
-		        gc.collect()
-		        
-		        ## Clear from disk cache
-		        cached_files = scan_cache_dir()
-		        for model_info in cached_files.repos:
-		            if model_path in model_info.repo_id:
-		                model_info.delete()
+				if torch.cuda.is_available():
+				    torch.cuda.empty_cache()
+				del model
+				gc.collect()
+				## Clear from disk cache
+				cached_files = scan_cache_dir()
+				for model_info in cached_files.repos:
+				    if model_path in model_info.repo_id:
+				        model_info.delete()
 
 
 cosdf = pd.DataFrame(gather_df)
