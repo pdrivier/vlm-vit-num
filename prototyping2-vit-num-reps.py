@@ -96,6 +96,9 @@ for mname, mspecs in MODELS.items():
 	## Load your processor and model
 	mpath, mclass, mprocessor = mspecs
 
+	## Set up the dataframe to save results
+	cosdf = []
+
 	try:
 		processor = mprocessor.from_pretrained(mpath)
 		model = mclass.from_pretrained(mpath)
@@ -167,6 +170,13 @@ for mname, mspecs in MODELS.items():
 					 "layer": layer}
 				gather_df.append(d)
 
+		cosdf = pd.DataFrame(gather_df)
+		savepath = "results/"
+		filename = mname + "-cossim.csv"
+		if not os.path.exists(savepath): 
+			os.mkdir(savepath)
+		cosdf.to_csv(os.path.join(savepath, filename))
+
 	finally:
 		## Cleanup model files to make room in machine!
 		if torch.cuda.is_available():
@@ -180,11 +190,7 @@ for mname, mspecs in MODELS.items():
 		        delete_repo_from_cache(repo.repo_id)
 
 
-cosdf = pd.DataFrame(gather_df)
-savepath = "results/"
-if not os.path.exists(savepath): 
-	os.mkdir(savepath)
-cosdf.to_csv(os.path.join(savepath, "cossim_samediff_tmp.csv"))
+
 
 import seaborn as sns
 
