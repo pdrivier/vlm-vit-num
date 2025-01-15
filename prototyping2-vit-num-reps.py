@@ -115,13 +115,13 @@ for pair in tqdm(list_of_imagepair_names):
 	for mname, mspecs in MODELS.items(): 
 
 		## Load your processor and model
-	    mpath, mclass, mprocessor = mspecs
+		mpath, mclass, mprocessor = mspecs
 
 		processor = mprocessor.from_pretrained(mpath)
 		model = mclass.from_pretrained(mpath)
 
 		##TODO: Here is where you'd want to iterate by model layer to get intermediate representations
-		if "clip" or "CLIP" in mname: 
+		if "clip" in mname.lower(): 
 			nlayers = len(model.vision_model.encoder.layers)
 		else: 
 			nlayers = len(model.encoder.layer)
@@ -135,15 +135,15 @@ for pair in tqdm(list_of_imagepair_names):
 				# Encode image
 				inputs = processor(images=image, return_tensors="pt")
 				with torch.no_grad():
-					outputs = model(**inputs)
 					## Grab just the CLS token out of the sequence of image tokens (this is 
-					# the middle "0" index in the outputs.last_hidden_state variable)
-					
-					if "clip" or "CLIP" in mname:
-						imfeats[image_name] = outputs.vision_model_output.hidden_states[layer][:,0,:]
-					else:
+					# the middle "0" index in the outputs.last_hidden_state variables
+					if "clip" in mname.lower():
+						outputs = model.vision_model(pixel_values=inputs.pixel_values, output_hidden_states=True)
 						imfeats[image_name] = outputs.hidden_states[layer][:,0,:]
-					# imfeats[image_name] = outputs.last_hidden_state[:,0,:]
+					else:
+						outputs = model(**inputs, output_hidden_states=True)
+						imfeats[image_name] = outputs.hidden_states[layer][:,0,:]
+					
 					
 					### TODO: not sure if I should normalize? 
 					# imfeats[image_name] = tmp / tmp.norm(dim=-1, keepdim=True)
