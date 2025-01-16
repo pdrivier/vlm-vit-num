@@ -199,10 +199,10 @@ import seaborn as sns
 
 
 
-for layer in range(nlayers + 1):
-	pair1 = imfeats[pair[0]][layer][:, 0, :]
-	pair2 = imfeats[pair[1]][layer][:, 0, :]
-	cos_sim = cosine_similarity(pair1, pair2)
-	print(layer)
-	print(cos_sim)
+# for layer in range(nlayers + 1):
+# 	pair1 = imfeats[pair[0]][layer][:, 0, :]
+# 	pair2 = imfeats[pair[1]][layer][:, 0, :]
+# 	cos_sim = cosine_similarity(pair1, pair2)
+# 	print(layer)
+# 	print(cos_sim)
 
