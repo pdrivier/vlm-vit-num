@@ -45,12 +45,12 @@ metadata = pd.read_csv(os.path.join(dpath,"metadata.csv"))
 #  e.g. we need to control for the image patch size! this might interact with numerosity comparison 
 #  estimates!!
 MODELS = {
-    'clip-vit-base-patch32': ['openai/clip-vit-base-patch32', CLIPModel, CLIPProcessor]#,
+    # 'clip-vit-base-patch32': ['openai/clip-vit-base-patch32', CLIPModel, CLIPProcessor]#,
     # 'clip-vit-large-patch14': ['openai/clip-vit-large-patch14', CLIPModel, CLIPProcessor],
     # 'clip-huge-14': ['laion/CLIP-ViT-H-14-laion2B-s32B-b79K', CLIPModel, CLIPProcessor],
     # 'clip-giant': ['laion/CLIP-ViT-g-14-laion2B-s12B-b42K', CLIPModel, CLIPProcessor],
     # 'clip-big-giant': ['laion/CLIP-ViT-bigG-14-laion2B-39B-b160k', CLIPModel, CLIPProcessor],
-    # 'vit-base-patch16-224-in21k':['google/vit-base-patch16-224-in21k',ViTModel, ViTImageProcessor]
+    'vit-base-patch16-224-in21k':['google/vit-base-patch16-224-in21k',ViTModel, ViTImageProcessor]
     }
 
 ## Sample multiple images matched for numerosity per image property (e.g. cum_area)
@@ -102,6 +102,7 @@ for mname, mspecs in MODELS.items():
 	try:
 		processor = mprocessor.from_pretrained(mpath)
 		model = mclass.from_pretrained(mpath)
+		model.eval()
 
 		##TODO: Here is where you'd want to iterate by model layer to get intermediate representations
 		if "clip" in mname.lower(): 
@@ -133,7 +134,32 @@ for mname, mspecs in MODELS.items():
 			area_diff = np.abs(im1_area-im2_area) 
 			numerosity_diff = np.abs(im1_numerosity-im2_numerosity)
 
+			### First, map image name to hidden states
+			imfeats = {}
+			for image_name in pair: 
+				image = Image.open(os.path.join(dpath,image_name)).convert("RGB")
+				# Encode image
+				inputs = processor(images=image, return_tensors="pt")
+				with torch.no_grad():
+					## Grab just the CLS token out of the sequence of image tokens (this is 
+					# the middle "0" index in the outputs.last_hidden_state variables
+					if "clip" in mname.lower():
+						outputs = model.vision_model(pixel_values=inputs.pixel_values, output_hidden_states=True)
+						imfeats[image_name] = outputs.hidden_states
+					else:
+						outputs = model(**inputs, output_hidden_states=True)
+						imfeats[image_name] = outputs.hidden_states			
+
+			### Then, for each layer, grab the right hidden state
+			# print(imfeats.keys())
 			for layer in range(nlayers):
+
+				pair1 = imfeats[pair[0]][layer][:, 0, :]
+				pair2 = imfeats[pair[1]][layer][:, 0, :]
+
+				cos_sim = cosine_similarity(pair1, pair2)
+
+				"""
 
 				## Grab the CLS representation for the image (token index 0)
 				imfeats = {}
@@ -157,6 +183,8 @@ for mname, mspecs in MODELS.items():
 
 				## Compute the cosine similarity of this pair
 				cos_sim = cosine_similarity(imfeats[pair[0]],imfeats[pair[1]])
+
+				"""
 
 				## Store the results and corresponding metadata
 				d = {"model_name": mname,
