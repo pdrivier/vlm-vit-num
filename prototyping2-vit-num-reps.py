@@ -148,43 +148,16 @@ for mname, mspecs in MODELS.items():
 						imfeats[image_name] = outputs.hidden_states
 					else:
 						outputs = model(**inputs, output_hidden_states=True)
-						imfeats[image_name] = outputs.hidden_states			
+						imfeats[image_name] = outputs.hidden_states		
 
-			### Then, for each layer, grab the right hidden state
+			### Then, for each layer, grab the corresponding hidden state
 			# print(imfeats.keys())
-			for layer in range(nlayers):
+			for layer in range(nlayers + 1):
 
 				pair1 = imfeats[pair[0]][layer][:, 0, :]
 				pair2 = imfeats[pair[1]][layer][:, 0, :]
 
 				cos_sim = cosine_similarity(pair1, pair2)
-
-				"""
-
-				## Grab the CLS representation for the image (token index 0)
-				imfeats = {}
-				for image_name in pair: 
-					image = Image.open(os.path.join(dpath,image_name)).convert("RGB")
-					# Encode image
-					inputs = processor(images=image, return_tensors="pt")
-					with torch.no_grad():
-						## Grab just the CLS token out of the sequence of image tokens (this is 
-						# the middle "0" index in the outputs.last_hidden_state variables
-						if "clip" in mname.lower():
-							outputs = model.vision_model(pixel_values=inputs.pixel_values, output_hidden_states=True)
-							imfeats[image_name] = outputs.hidden_states[layer][:,0,:]
-						else:
-							outputs = model(**inputs, output_hidden_states=True)
-							imfeats[image_name] = outputs.hidden_states[layer][:,0,:]
-						
-						
-						### TODO: not sure if I should normalize? 
-						# imfeats[image_name] = tmp / tmp.norm(dim=-1, keepdim=True)
-
-				## Compute the cosine similarity of this pair
-				cos_sim = cosine_similarity(imfeats[pair[0]],imfeats[pair[1]])
-
-				"""
 
 				## Store the results and corresponding metadata
 				d = {"model_name": mname,
@@ -197,6 +170,7 @@ for mname, mspecs in MODELS.items():
 					 "numerosity_comparison_type": comparison_type,
 					 "layer": layer}
 				gather_df.append(d)
+
 
 		cosdf = pd.DataFrame(gather_df)
 		savepath = "results/"
@@ -222,4 +196,13 @@ for mname, mspecs in MODELS.items():
 
 import seaborn as sns
 
+
+
+
+for layer in range(nlayers + 1):
+	pair1 = imfeats[pair[0]][layer][:, 0, :]
+	pair2 = imfeats[pair[1]][layer][:, 0, :]
+	cos_sim = cosine_similarity(pair1, pair2)
+	print(layer)
+	print(cos_sim)
 
