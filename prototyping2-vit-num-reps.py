@@ -22,6 +22,21 @@ from torch.nn.functional import cosine_similarity
 import torch.nn.functional as F
 
 
+def count_parameters(model):
+    """credit: https://stackoverflow.com/questions/49201236/check-the-total-number-of-parameters-in-a-pytorch-model"""
+    
+	total_params = 0
+	for name, parameter in model.named_parameters():
+	    # if the param is not trainable, skip it
+	    if not parameter.requires_grad:
+	        continue
+	    # otherwise, count it towards your number of params
+	    params = parameter.numel()
+	    total_params += params
+	print(f"Total Trainable Params: {total_params}")
+    
+    return total_params
+    
 def generate_random_pairs(items, n_pairs):
     # Make sure we can generate the requested number of pairs
     max_pairs = len(items) * (len(items) - 1) // 2
@@ -46,11 +61,11 @@ metadata = pd.read_csv(os.path.join(dpath,"metadata.csv"))
 #  estimates!!
 MODELS = {
     # 'clip-vit-base-patch32': ['openai/clip-vit-base-patch32', CLIPModel, CLIPProcessor]#,
-    # 'clip-vit-large-patch14': ['openai/clip-vit-large-patch14', CLIPModel, CLIPProcessor],
+    'clip-vit-large-patch14': ['openai/clip-vit-large-patch14', CLIPModel, CLIPProcessor],
     # 'clip-huge-14': ['laion/CLIP-ViT-H-14-laion2B-s32B-b79K', CLIPModel, CLIPProcessor],
     # 'clip-giant': ['laion/CLIP-ViT-g-14-laion2B-s12B-b42K', CLIPModel, CLIPProcessor],
     # 'clip-big-giant': ['laion/CLIP-ViT-bigG-14-laion2B-39B-b160k', CLIPModel, CLIPProcessor],
-    'vit-base-patch16-224-in21k':['google/vit-base-patch16-224-in21k',ViTModel, ViTImageProcessor]
+    # 'vit-base-patch16-224-in21k':['google/vit-base-patch16-224-in21k',ViTModel, ViTImageProcessor]
     }
 
 ## TODO: move this to a different file, then call it to generate images or load 
@@ -106,6 +121,9 @@ for mname, mspecs in MODELS.items():
 		model = mclass.from_pretrained(mpath)
 		model.eval()
 
+		## Grab the number of trainable parameters in the model
+		# should work for both clip and vit-only models!
+		n_params = count_parameters(model)
 
 		##TODO: Here is where you'd want to iterate by model layer to get intermediate representations
 		if "clip" in mname.lower(): 
@@ -178,6 +196,7 @@ for mname, mspecs in MODELS.items():
 					 "area_diff": area_diff,
 					 "numerosity_comparison_type": comparison_type,
 					 "layer": layer,
+					 "n_params": n_params,
 					 "patch_size": patch_size}
 				gather_df.append(d)
 
