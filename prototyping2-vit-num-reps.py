@@ -21,7 +21,7 @@ from PIL import Image
 from torch.nn.functional import cosine_similarity
 import torch.nn.functional as F
 
-##TODO: need to ensure target number of same/diff 
+
 def generate_random_pairs(items, n_pairs):
     # Make sure we can generate the requested number of pairs
     max_pairs = len(items) * (len(items) - 1) // 2
@@ -46,13 +46,15 @@ metadata = pd.read_csv(os.path.join(dpath,"metadata.csv"))
 #  estimates!!
 MODELS = {
     # 'clip-vit-base-patch32': ['openai/clip-vit-base-patch32', CLIPModel, CLIPProcessor]#,
-    'clip-vit-large-patch14': ['openai/clip-vit-large-patch14', CLIPModel, CLIPProcessor],
+    # 'clip-vit-large-patch14': ['openai/clip-vit-large-patch14', CLIPModel, CLIPProcessor],
     # 'clip-huge-14': ['laion/CLIP-ViT-H-14-laion2B-s32B-b79K', CLIPModel, CLIPProcessor],
     # 'clip-giant': ['laion/CLIP-ViT-g-14-laion2B-s12B-b42K', CLIPModel, CLIPProcessor],
     # 'clip-big-giant': ['laion/CLIP-ViT-bigG-14-laion2B-39B-b160k', CLIPModel, CLIPProcessor],
-    # 'vit-base-patch16-224-in21k':['google/vit-base-patch16-224-in21k',ViTModel, ViTImageProcessor]
+    'vit-base-patch16-224-in21k':['google/vit-base-patch16-224-in21k',ViTModel, ViTImageProcessor]
     }
 
+## TODO: move this to a different file, then call it to generate images or load 
+# images from preset list
 ## Sample multiple images matched for numerosity per image property (e.g. cum_area)
 min_area = metadata["cum_area"].min()
 max_area = metadata["cum_area"].max()
@@ -70,7 +72,7 @@ _, area_bin_intervals = pd.cut(bins,10,retbins=True)
 ## Create the list of image pairs you'll get cosine similarity for
 numerosities = list(set(metadata["numerosity"].values))
 imagepair_ix_list_same = []
-n_pairs = 10
+n_pairs = 10 #number of image pairs per numerosity value
 for numerosity in numerosities:
 	subnum = metadata[metadata["numerosity"] == numerosity]
 	imagepair_ix_list_same.append(generate_random_pairs(subnum.index.tolist(),n_pairs))
@@ -80,6 +82,7 @@ image_ix_list = [item for tup in imagepair_ix_list_same for item in tup]
 select_metadata = metadata[metadata.index.isin(image_ix_list)]
 
 ## Create list of different-numerosity image pairs
+## TODO: ugh, soo
 imagepair_ix_list_diff = generate_random_pairs(image_ix_list,len(image_ix_list)/2)
 
 ## Concatenate the list of same- and different-numerosity pairs
@@ -92,7 +95,6 @@ list_of_imagepair_names = [("stimulus_"+str(i[0])+".png","stimulus_"+str(i[1])+"
 ## Set up results-gathering variable
 gather_df = []
 for mname, mspecs in MODELS.items(): 
-
 	## Load your processor and model
 	mpath, mclass, mprocessor = mspecs
 
@@ -104,11 +106,15 @@ for mname, mspecs in MODELS.items():
 		model = mclass.from_pretrained(mpath)
 		model.eval()
 
+
 		##TODO: Here is where you'd want to iterate by model layer to get intermediate representations
 		if "clip" in mname.lower(): 
 			nlayers = len(model.vision_model.encoder.layers)
+			patch_size = model.config.vision_config.patch_size
+
 		else: 
 			nlayers = len(model.encoder.layer)
+			patch_size = model.config.patch_size
 
 		## Iterate through the image pairs and get layerwise cosine distances
 		for pair in tqdm(list_of_imagepair_names): 
@@ -152,6 +158,7 @@ for mname, mspecs in MODELS.items():
 
 			### Then, for each layer, grab the corresponding hidden state
 			# print(imfeats.keys())
+			## TODO: Add patch size and number of parameters!!
 			for layer in range(nlayers + 1):
 
 				pair1 = imfeats[pair[0]][layer][:, 0, :]
@@ -160,7 +167,9 @@ for mname, mspecs in MODELS.items():
 				cos_sim = cosine_similarity(pair1, pair2)
 
 				## Store the results and corresponding metadata
+				## TODO: get the number of params and patch size
 				d = {"model_name": mname,
+					 "image_type": image_type,
 					 "image_1": pair[0],
 					 "image_2": pair[1],
 					 "cosine_similarity": cos_sim.detach().numpy()[0],
@@ -168,7 +177,8 @@ for mname, mspecs in MODELS.items():
 					 "numerosity_2": im2_numerosity, 
 					 "area_diff": area_diff,
 					 "numerosity_comparison_type": comparison_type,
-					 "layer": layer}
+					 "layer": layer,
+					 "patch_size": patch_size}
 				gather_df.append(d)
 
 
