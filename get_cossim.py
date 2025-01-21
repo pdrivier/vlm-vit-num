@@ -24,7 +24,6 @@ import torch.nn.functional as F
 
 def count_parameters(model):
     """credit: https://stackoverflow.com/questions/49201236/check-the-total-number-of-parameters-in-a-pytorch-model"""
-    
 	total_params = 0
 	for name, parameter in model.named_parameters():
 	    # if the param is not trainable, skip it
@@ -34,16 +33,23 @@ def count_parameters(model):
 	    params = parameter.numel()
 	    total_params += params
 	print(f"Total Trainable Params: {total_params}")
-    
-    return total_params
+	return total_params
    
 
 ## TODO: Load list of image pairs
+image_file = "image_pair_names"
+
 image_type = "rectangles"
 dpath = "../vlm-vit-num-tmp/data/stimuli/{x}/".format(x=image_type)
-list_of_imagepair_names = ...
+
+imagepair_filename = "imagepair-names-" + image_type + ".pkl"
+with open(imagepair_filename, 'rb') as file:
+    list_of_imagepair_names = pickle.load(file)
 
 metadata = pd.read_csv(os.path.join(dpath,"metadata.csv"))
+image_ix_list = [item for sublist in list_of_imagepair_names for item in sublist]
+image_ix_list = [i.split("_")[1].split(".png")[0] for i in image_ix_list]
+select_metadata = metadata.iloc[image_ix_list]
 
 ## Define the hugging face paths for models and corresponding image processors
 MODELS = {
