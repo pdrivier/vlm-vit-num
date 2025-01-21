@@ -95,12 +95,10 @@ for mname, mspecs in MODELS.items():
 		imix1 = int(pair[0].split("_")[1].split(".png")[0])
 		im1_numerosity = metadata.loc[imix1]["numerosity"]
 		im1_area = metadata.loc[imix1]["cum_area"]
-		im1_areabin = metadata.loc[imix1]["cum_area_bins"]
 
 		imix2 = int(pair[1].split("_")[1].split(".png")[0])
 		im2_numerosity = metadata.loc[imix2]["numerosity"]
 		im2_area = metadata.loc[imix2]["cum_area"]
-		im2_areabin = metadata.loc[imix2]["cum_area_bins"]
 
 		## Figure out what kind of comparison type this is
 		if (im1_numerosity - im2_numerosity == 0):
