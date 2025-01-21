@@ -37,18 +37,22 @@ def count_parameters(model):
     return total_params
    
 
-## TODO: add an if statement to check for imagelist file's existence!
-image_type = "rectangles"
+## TODO: test this!
+image_type = "rectangles" #or "dots"
 dpath = "../vlm-vit-num-tmp/data/stimuli/{x}/".format(x=image_type)
 
-imagepair_filename = "imagepair-names-" + image_type + ".pkl"
-with open(imagepair_filename, 'rb') as file:
-    list_of_imagepair_names = pickle.load(file)
-
 metadata = pd.read_csv(os.path.join(dpath,"metadata.csv"))
-image_ix_list = [item for sublist in list_of_imagepair_names for item in sublist]
-image_ix_list = [i.split("_")[1].split(".png")[0] for i in image_ix_list]
-select_metadata = metadata.iloc[image_ix_list]
+
+imagepair_filename = "imagepair-names-" + image_type + ".pkl"
+if os.path.exists(imagepair_filename):
+	with open(imagepair_filename, 'rb') as file:
+	    list_of_imagepair_names = pickle.load(file)
+    image_ix_list = [item for sublist in list_of_imagepair_names for item in sublist]
+	image_ix_list = [i.split("_")[1].split(".png")[0] for i in image_ix_list]
+	select_metadata = metadata.iloc[image_ix_list]
+else:
+	select_metadata, list_of_imagepair_names = generate_imagepair_list(metadata,dpath)
+
 
 ## Define the hugging face paths for models and corresponding image processors
 MODELS = {
