@@ -37,7 +37,7 @@ def count_parameters(model):
     return total_params
    
 
-## TODO: Test to check this works!
+## TODO: add an if statement to check for imagelist file's existence!
 image_type = "rectangles"
 dpath = "../vlm-vit-num-tmp/data/stimuli/{x}/".format(x=image_type)
 
@@ -52,14 +52,13 @@ select_metadata = metadata.iloc[image_ix_list]
 
 ## Define the hugging face paths for models and corresponding image processors
 MODELS = {
-    'clip-vit-base-patch32': ['openai/clip-vit-base-patch32', CLIPModel, CLIPProcessor]#,
-    # 'clip-vit-large-patch14': ['openai/clip-vit-large-patch14', CLIPModel, CLIPProcessor],
+    'clip-vit-base-patch32': ['openai/clip-vit-base-patch32', CLIPModel, CLIPProcessor],
+    'clip-vit-large-patch14': ['openai/clip-vit-large-patch14', CLIPModel, CLIPProcessor],
     # 'clip-huge-14': ['laion/CLIP-ViT-H-14-laion2B-s32B-b79K', CLIPModel, CLIPProcessor],
     # 'clip-giant': ['laion/CLIP-ViT-g-14-laion2B-s12B-b42K', CLIPModel, CLIPProcessor],
     # 'clip-big-giant': ['laion/CLIP-ViT-bigG-14-laion2B-39B-b160k', CLIPModel, CLIPProcessor],
-    # 'vit-base-patch16-224-in21k':['google/vit-base-patch16-224-in21k',ViTModel, ViTImageProcessor]
+    'vit-base-patch16-224-in21k':['google/vit-base-patch16-224-in21k',ViTModel, ViTImageProcessor]
     }
-
 
 ## Set up results-gathering variable
 gather_df = []
