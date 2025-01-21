@@ -1,4 +1,3 @@
-#tmp prototyping
 import gc #garbage collection
 import itertools
 import os 
@@ -12,6 +11,7 @@ import numpy as np
 from random import sample
 from scipy.spatial.distance import cosine
 
+from get_image_pairs import generate_random_pairs, generate_imagepair_list
 from tqdm import tqdm
 
 from huggingface_hub import try_to_load_from_cache, scan_cache_dir
@@ -36,23 +36,13 @@ def count_parameters(model):
 	print(f"Total Trainable Params: {total_params}")
     
     return total_params
-    
-def generate_random_pairs(items, n_pairs):
-    # Make sure we can generate the requested number of pairs
-    max_pairs = len(items) * (len(items) - 1) // 2
-    if n_pairs > max_pairs:
-        raise ValueError(f"Can't generate {n_pairs} unique pairs from {len(items)} items. Maximum possible is {max_pairs}")
-    pairs = set()
-    while len(pairs) < n_pairs:
-        # Get two random items
-        a, b = sample(items, 2)
-        # Add as tuple, sorting to ensure (a,b) and (b,a) are treated as same pair
-        pairs.add(tuple(sorted([a, b])))
-    return list(pairs)
+   
 
+## TODO: Load list of image pairs
 image_type = "rectangles"
-# dpath = "data/stimuli/{x}/".format(x=image_type)
-dpath = "../vlm-vit-num-tmp/data/stimuli/{x}/".format(x=image_type) #prototyping dpath
+dpath = "../vlm-vit-num-tmp/data/stimuli/{x}/".format(x=image_type)
+list_of_imagepair_names = ...
+
 metadata = pd.read_csv(os.path.join(dpath,"metadata.csv"))
 
 ## Define the hugging face paths for models and corresponding image processors
@@ -65,52 +55,6 @@ MODELS = {
     # 'vit-base-patch16-224-in21k':['google/vit-base-patch16-224-in21k',ViTModel, ViTImageProcessor]
     }
 
-## TODO: move this to a different file, then call it to generate images or load 
-# images from preset list
-## Sample multiple images matched for numerosity per image property (e.g. cum_area)
-min_area = metadata["cum_area"].min()
-max_area = metadata["cum_area"].max()
-
-## Define stimulus cumulative area bins and labels
-nbins = 10
-bins = np.linspace(min_area, max_area, nbins)
-labels = np.linspace(0, nbins-1, nbins)
-labels = labels[:-1]
-
-## Bin cumulative area
-metadata['cum_area_bins'] = pd.cut(metadata["cum_area"], bins=bins, labels=labels, include_lowest=True)
-_, area_bin_intervals = pd.cut(bins,10,retbins=True)
-
-## Create the list of image pairs you'll get cosine similarity for
-numerosities = list(set(df["numerosity"].values))
-imagepair_ix_list_same = []
-n_pairs = 10 #number of image pairs per numerosity value
-for numerosity in numerosities:
-	subnum = df[df["numerosity"] == numerosity]
-	imagepair_ix_list_same.append(generate_random_pairs(subnum.index.tolist(),n_pairs))
-
-imagepair_ix_list_same = [item for sublist in imagepair_ix_list_same for item in sublist]
-image_ix_list = [item for tup in imagepair_ix_list_same for item in tup]
-select_metadata = df[df.index.isin(image_ix_list)]
-
-## Create list of different-numerosity image pairs
-## TODO: ugh, fix this:
-imagepair_ix_list_diff = []
-for numerosity in numerosities: 
-	subnum_target = select_metadata[select_metadata["numerosity"]==numerosity]
-	subnum_others = select_metadata[select_metadata["numerosity"]!=numerosity]
-	target_ix_list = random.sample(subnum_target.index.tolist(),n_pairs)
-	for target_ix in target_ix_list:
-		## Create a tuple containing (image_target_numerosity, image_other_numerosity)
-		other_ix = random.sample(subnum_others.index.tolist(),1)[0]
-		imagepair_ix_list_diff.append((target_ix, other_ix))
-
-## Concatenate the list of same- and different-numerosity pairs
-imagepair_ix_list = [imagepair_ix_list_same, imagepair_ix_list_diff]
-imagepair_ix_list = [item for sublist in imagepair_ix_list for item in sublist]
-
-## Create list of image names for the corresponding images
-list_of_imagepair_names = [("stimulus_"+str(i[0])+".png","stimulus_"+str(i[1])+".png") for i in imagepair_ix_list]
 
 ## Set up results-gathering variable
 gather_df = []
@@ -188,7 +132,6 @@ for mname, mspecs in MODELS.items():
 				cos_sim = cosine_similarity(pair1, pair2)
 
 				## Store the results and corresponding metadata
-				## TODO: get the number of params and patch size
 				d = {"model_name": mname,
 					 "image_type": image_type,
 					 "image_1": pair[0],
@@ -206,7 +149,7 @@ for mname, mspecs in MODELS.items():
 
 		cosdf = pd.DataFrame(gather_df)
 		savepath = "results/"
-		filename = mname + "-cossim.csv"
+		filename = mname + "-" + image_type + "-cossim.csv"
 		if not os.path.exists(savepath): 
 			os.mkdir(savepath)
 		cosdf.to_csv(os.path.join(savepath, filename))
@@ -222,8 +165,3 @@ for mname, mspecs in MODELS.items():
 		for repo in cached_files.repos:
 		    if mpath in repo.repo_id:
 		        delete_repo_from_cache(repo.repo_id)
-
-
-
-
-
