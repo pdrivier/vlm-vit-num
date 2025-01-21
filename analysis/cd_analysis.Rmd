@@ -1,0 +1,367 @@
+---
+title: "Multimodal Models and Numerosity"
+date: "September 12, 2024"
+output:
+  # pdf_document: 
+  #    fig_caption: yes
+  #    keep_md: yes
+  #    keep_tex: yes
+  html_document:
+     keep_md: yes
+     toc: yes
+     toc_float: yes
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(dpi = 300, fig.format = "pdf")
+```
+
+```{r include=FALSE}
+library(tidyverse)
+library(lmtest)
+library(forcats)
+library(broom)
+library(lme4)
+library(ggridges)
+library(lmerTest)
+library(broom.mixed)
+library(ggrepel)
+library(tools)
+library(viridis)
+
+library(ggcorrplot)
+
+all_colors <- viridis::viridis(10, option = "mako")
+my_colors <- all_colors[c(3, 5, 7)]  # Selecting specific colors from the palette
+```
+
+
+# Load data
+
+```{r}
+# setwd("/Users/seantrott/Dropbox/UCSD/Research/NLMs/vlm-vit-num/analysis")
+directory_path <- "../results"
+csv_files <- list.files(path = directory_path, pattern = "*.csv", full.names = TRUE)
+csv_list <- csv_files %>%
+  map(~ read_csv(.))
+df_hf_models <- bind_rows(csv_list)
+
+
+df_hf_models = df_hf_models %>%
+  mutate(numerosity_diff = abs(numerosity_2 - numerosity_1)) %>%
+  group_by(model_name) %>%
+  mutate(max_layer = max(layer))
+
+
+table(df_hf_models$model_name)
+
+```
+
+
+# Descriptive analyses
+
+```{r}
+df_hf_models %>%
+  ggplot(aes(x = numerosity_diff)) +
+  geom_bar(stat = "count", alpha = .6) +
+  theme_minimal() +
+  labs(x = "Difference in Numerosity") +
+  theme(text = element_text(size = 15),
+        legend.position = "bottom")
+
+df_hf_models %>%
+  ggplot(aes(x = area_diff)) +
+  geom_bar(stat = "count", alpha = .6) +
+  theme_minimal() +
+  labs(x = "Difference in Surface Area") +
+  theme(text = element_text(size = 15),
+        legend.position = "bottom")
+
+df_hf_models %>%
+  ggplot(aes(x = cosine_similarity)) +
+  geom_histogram(alpha = .6) +
+  theme_minimal() +
+  labs(x = "Cosine Similarity") +
+  theme(text = element_text(size = 15)) +
+  facet_wrap(~model_name)
+
+```
+
+# Analyses
+
+## Same Vs. Different Numerosity
+
+```{r}
+df_summary <- df_hf_models %>%
+  mutate(area_diff_binned = ntile(area_diff, 4)) %>%
+  group_by(model_name, numerosity_comparison_type, layer) %>%
+  summarize(avg_similarity = mean(cosine_similarity, na.rm = TRUE),
+            se_similarity = sd(cosine_similarity, na.rm = TRUE) / sqrt(n()))
+
+df_summary %>%
+  filter(layer == 12) %>%
+  ggplot(aes(x = model_name,
+             y = avg_similarity,
+             fill = numerosity_comparison_type)) +
+  geom_bar(stat = "identity", 
+           position = position_dodge(width = 0.5),
+           width = .6) +  
+  geom_errorbar(aes(ymin = avg_similarity - se_similarity, 
+                    ymax = avg_similarity + se_similarity), 
+                width = 0.2,
+                position = position_dodge(width = 0.5)) + 
+  labs(# title = "",
+       x = "Model",
+       y = "Average Cosine Similarity",
+       fill = "") +
+  theme_minimal() +
+  coord_flip() +
+  scale_fill_viridis(option = "mako", discrete=TRUE) +
+  theme(axis.title = element_text(size=rel(1.2)),
+        axis.text = element_text(size = rel(1.2)),
+        legend.text = element_text(size = rel(1.2)),
+        # legend.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.2)),
+        legend.position = "bottom")
+
+m1 = lmer(data = df_hf_models,
+          cosine_similarity ~ area_diff *layer + numerosity_comparison_type * layer + 
+            (1 | image_1) + (1 | image_2) + (1 + numerosity_comparison_type|model_name))
+
+summary(m1)
+```
+
+
+## Continuous function of numerosity
+
+
+```{r}
+df_hf_models %>%
+  filter(layer == max_layer) %>%
+  ggplot(aes(x = numerosity_diff,
+             y = cosine_similarity)) +
+  geom_point(alpha = .5) +
+  geom_smooth(method = "lm") +
+  theme_minimal() +
+  labs(# title = "",
+       x = "Numerosity Difference",
+       y = "Cosine Similarity",
+       fill = "") +
+  theme(text = element_text(size = 15),
+        legend.position = "bottom") +
+  facet_wrap(~model_name)
+
+### Run lm by layer
+results <- df_hf_models %>%
+  # mutate(numerosity_diff = scale(numerosity_diff),
+  #       cosine_similarity = scale(cosine_similarity)) %>%
+  dplyr::group_by(layer, model_name) %>%
+  dplyr::summarise(
+    model_summary = list(
+      broom::tidy(lm(cosine_similarity ~ numerosity_diff + area_diff, data = dplyr::cur_data()))
+    ),
+    r_squared = summary(lm(cosine_similarity ~ numerosity_diff + area_diff, data = dplyr::cur_data()))$r.squared
+  ) %>%
+  dplyr::mutate(
+    numerosity_diff_coef = purrr::map_dbl(model_summary, ~ .x %>% dplyr::filter(term == "numerosity_diff") %>% dplyr::pull(estimate)),
+    numerosity_diff_se = purrr::map_dbl(model_summary, ~ .x %>% dplyr::filter(term == "numerosity_diff") %>% dplyr::pull(std.error)),
+    area_diff_coef = purrr::map_dbl(model_summary, ~ .x %>% dplyr::filter(term == "area_diff") %>% dplyr::pull(estimate)),
+    area_diff_se = purrr::map_dbl(model_summary, ~ .x %>% dplyr::filter(term == "area_diff") %>% dplyr::pull(std.error))
+  ) %>%
+  dplyr::select(layer, model_name, numerosity_diff_coef, numerosity_diff_se, area_diff_coef, area_diff_se, r_squared)
+
+results %>%
+  ggplot(aes(x = layer, y = numerosity_diff_coef, fill = model_name)) +
+  geom_line(linetype = "dotted") +  # Lineplot for mean entropy
+  geom_ribbon(aes(ymin = numerosity_diff_coef - numerosity_diff_se, 
+                  ymax = numerosity_diff_coef + numerosity_diff_se),
+              alpha = 0.5,
+              color = NA) +  # Shading for SE
+  labs(
+    title = "",
+    x = "Layer",
+    y = "Coefficient (Numerosity)",
+    fill = "",
+  ) +
+  theme_minimal() +
+  scale_x_continuous(limits = c(0, max(results$layer)),
+                     breaks = seq(0, max(results$layer), 2)) +
+  theme(text = element_text(size = 15),
+        legend.position = "bottom") +
+  scale_color_viridis(option = "mako", discrete=TRUE)
+
+
+results %>%
+  ggplot(aes(x = layer, y = area_diff_coef, fill = model_name)) +
+  geom_line(linetype = "dotted") +  # Lineplot for mean entropy
+  geom_ribbon(aes(ymin = area_diff_coef - area_diff_se, 
+                  ymax = area_diff_coef + area_diff_se),
+              alpha = 0.5,
+              color = NA) +  # Shading for SE
+  labs(
+    title = "",
+    x = "Layer",
+    y = "Coefficient (Area)",
+    fill = "",
+  ) +
+  theme_minimal() +
+  scale_x_continuous(limits = c(0, max(results$layer)),
+                     breaks = seq(0, max(results$layer), 2)) +
+  theme(text = element_text(size = 15),
+        legend.position = "bottom") +
+  scale_color_viridis(option = "mako", discrete=TRUE)
+
+
+
+m1 = lmer(data = df_hf_models,
+          cosine_similarity ~ area_diff * layer + numerosity_diff *layer + 
+            (1 | image_1) + (1 | image_2) + (1 | model_name))
+
+summary(m1)
+
+
+
+### Layer depth ratio
+
+results %>%
+  group_by(model_name) %>%
+  mutate(max_layer = max(layer),
+         prop_layer = layer / max_layer) %>%
+  mutate(binned_prop_layer = ntile(prop_layer, 10)) %>%
+  mutate(prop_binned = binned_prop_layer / 10) %>%
+  ggplot(aes(x = prop_binned, y = numerosity_diff_coef, fill = model_name)) +
+  geom_line(linetype = "dotted") +  # Lineplot for mean entropy
+  geom_ribbon(aes(ymin = numerosity_diff_coef - numerosity_diff_se, 
+                  ymax = numerosity_diff_coef + numerosity_diff_se),
+              alpha = 0.5,
+              color = NA) +  # Shading for SE
+  labs(
+    title = "",
+    x = "Layer Depth",
+    y = "Coefficient (Numerosity)",
+    fill = "",
+  ) +
+  theme_minimal() +
+  theme(text = element_text(size = 15),
+        legend.position = "bottom") +
+  scale_color_viridis(option = "mako", discrete=TRUE)
+
+
+
+results %>%
+  group_by(model_name) %>%
+  mutate(max_layer = max(layer),
+         prop_layer = layer / max_layer) %>%
+  mutate(binned_prop_layer = ntile(prop_layer, 10)) %>%
+  mutate(prop_binned = binned_prop_layer / 10) %>%
+  ggplot(aes(x = prop_binned, y = numerosity_diff_coef)) +
+  stat_summary(
+    aes(group = model_name,
+        color = model_name),  
+    fun = mean,    
+    geom = "line",        
+    size = 2              
+  ) +
+  stat_summary(
+    aes(group = model_name, 
+        fill = model_name), 
+    fun.data = mean_se,    
+    geom = "ribbon",  
+    alpha = 0.2,   
+    color = NA     
+  ) +
+  theme_minimal() +
+  labs(
+    title = "",
+    x = "Layer Depth",
+    y = "Coefficient (Numerosity)",
+    fill = "",
+    color = "",
+  ) +
+  scale_color_viridis(option = "mako", discrete = TRUE) +
+  theme(text = element_text(size = 15),
+        legend.position = "bottom") 
+
+```
+
+
+# VLM vs. ViT
+
+## Same vs. Different
+
+```{r}
+
+df_hf_models = df_hf_models %>%
+  mutate(model_type = case_when(
+    str_detect(model_name, "clip") == TRUE ~ "VLM",
+    TRUE ~ "ViT")) %>%
+  group_by(model_name) %>%
+  mutate(max_layer = max(layer))
+
+df_summary <- df_hf_models %>%
+  filter(layer == max_layer) %>%
+  group_by(model_type, numerosity_comparison_type) %>%
+  summarize(avg_similarity = mean(cosine_similarity, na.rm = TRUE),
+            se_similarity = sd(cosine_similarity, na.rm = TRUE) / sqrt(n()))
+
+df_summary %>%
+  ggplot(aes(x = factor(model_type),
+             y = avg_similarity,
+             color = numerosity_comparison_type)) +
+  geom_point(position = position_dodge(width = 0.5), size = 2) +  
+  geom_errorbar(aes(ymin = avg_similarity - 2 * se_similarity, 
+                    ymax = avg_similarity + 2 * se_similarity), 
+                width = 0.2,
+                position = position_dodge(width = 0.5)) + 
+  labs(# title = "",
+       x = "Model Type",
+       y = "Average Cosine Similarity",
+       color = "") +
+  theme_minimal() +
+  scale_color_viridis(option = "mako", discrete=TRUE) +
+  theme(axis.title = element_text(size=rel(1.2)),
+        axis.text = element_text(size = rel(1.2)),
+        legend.text = element_text(size = rel(1.2)),
+        # legend.title = element_text(size = rel(1.5)),
+        strip.text.x = element_text(size = rel(1.2)),
+        legend.position = "bottom")
+
+
+m1 = lmer(data = filter(df_hf_models, layer == max_layer),
+          cosine_similarity ~ area_diff * model_type + numerosity_comparison_type * model_type + 
+            (1 | image_1) + (1 | image_2) + (1 | model_name))
+
+summary(m1)
+```
+
+## Continuous
+
+```{r}
+
+df_hf_models %>%
+  filter(layer == max_layer) %>%
+  ggplot(aes(x = numerosity_diff,
+             y = cosine_similarity,
+             color = model_type)) +
+  geom_point(alpha = .5) +
+  geom_smooth(method = "lm") +
+  theme_minimal() +
+  labs(x = "Numerosity Difference",
+       y = "Cosine Similarity",
+       color = "") +
+  scale_color_viridis(option = "mako", discrete=TRUE) +
+  theme(text = element_text(size = 15),
+        legend.position = "bottom") +
+  facet_wrap(~model_type)
+
+
+m1 = lmer(data = filter(df_hf_models, layer == max_layer),
+          cosine_similarity ~ area_diff * model_type + numerosity_diff * model_type + 
+            (1 | image_1) + (1 | image_2) + (1 | model_name))
+
+summary(m1)
+
+```
+
+
