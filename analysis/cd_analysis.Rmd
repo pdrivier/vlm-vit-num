@@ -55,11 +55,16 @@ df_hf_models = df_hf_models %>%
   mutate(max_layer = max(layer)) %>%
   mutate(model_type = case_when(
     str_detect(model_name, "clip") == TRUE ~ "VLM",
-    TRUE ~ "ViT")) 
+    TRUE ~ "ViT"))  %>%
+  mutate(cosine_similarity_z = scale(cosine_similarity),
+         numerosity_diff_z = scale(numerosity_diff),
+         area_diff_z = scale(area_diff)) %>%
+  mutate(model_name2 = str_extract(model_name, "^(?:[^-]*-?){1,3}[^-]*"))
 
 
 table(df_hf_models$model_name)
 table(df_hf_models$model_name, df_hf_models$numerosity_comparison_type)
+table(df_hf_models$model_name, df_hf_models$image_type)
 
 ```
 
@@ -99,18 +104,17 @@ df_hf_models %>%
 
 ```{r}
 df_summary <- df_hf_models %>%
-  group_by(model_name, numerosity_comparison_type, layer, max_layer, image_type) %>%
+  group_by(model_name2, numerosity_comparison_type, layer, max_layer, image_type) %>%
   summarize(avg_similarity = mean(cosine_similarity, na.rm = TRUE),
             se_similarity = sd(cosine_similarity, na.rm = TRUE) / sqrt(n()))
 
 df_summary %>%
   filter(layer == max_layer) %>%
-  ggplot(aes(x = model_name,
+  ggplot(aes(x = model_name2,
              y = avg_similarity,
              fill = numerosity_comparison_type)) +
-  geom_bar(stat = "identity", 
-           position = position_dodge(width = 0.5),
-           width = .6) +  
+  geom_bar(stat = "identity", position = position_dodge(width = 0.5), width = .6) +  
+  # geom_point(position = position_dodge(width = 0.5)) +
   geom_errorbar(aes(ymin = avg_similarity - se_similarity, 
                     ymax = avg_similarity + se_similarity), 
                 width = 0.2,
@@ -118,10 +122,13 @@ df_summary %>%
   labs(# title = "",
        x = "Model",
        y = "Average Cosine Similarity",
-       fill = "") +
+       fill = "",
+       color = "") +
   theme_minimal() +
   coord_flip() +
-  scale_fill_viridis(option = "mako", discrete=TRUE) +
+  scale_fill_viridis(discrete=TRUE) +
+  # scale_color_viridis_d() +
+  scale_y_continuous(n.breaks = 3) +
   theme(axis.title = element_text(size=rel(1.2)),
         axis.text = element_text(size = rel(1.2)),
         legend.text = element_text(size = rel(1.2)),
@@ -130,9 +137,12 @@ df_summary %>%
         legend.position = "bottom") +
   facet_wrap(~image_type)
 
+
+
 m1 = lmer(data = df_hf_models,
-          cosine_similarity ~ area_diff *layer + numerosity_comparison_type * layer + 
-            (1 | image_1) + (1 | image_2) + (1 + numerosity_comparison_type|model_name))
+          cosine_similarity_z ~ area_diff_z *layer + numerosity_comparison_type * layer + 
+            (1 | image_1) + (1 | image_2) + 
+            (1 |model_name))
 
 summary(m1)
 ```
@@ -142,20 +152,26 @@ summary(m1)
 
 
 ```{r}
+df_hf_models <- df_hf_models %>%
+  mutate(model_name2 = str_extract(model_name, "^(?:[^-]*-?){1,3}[^-]*"))
+
 df_hf_models %>%
   filter(layer == max_layer) %>%
   ggplot(aes(x = numerosity_diff,
-             y = cosine_similarity)) +
+             y = cosine_similarity,
+             color = model_type)) +
   geom_point(alpha = .5) +
   geom_smooth(method = "lm") +
   theme_minimal() +
+  scale_color_viridis(option = "mako", discrete=TRUE) +
   labs(# title = "",
        x = "Numerosity Difference",
        y = "Cosine Similarity",
-       fill = "") +
+       fill = "",
+       color = "Model Type") +
   theme(text = element_text(size = 12),
         legend.position = "bottom") +
-  facet_wrap(~model_name)
+  facet_wrap(~reorder(model_name2, n_params))
 
 ### Run lm by layer
 results <- df_hf_models %>%
@@ -164,23 +180,23 @@ results <- df_hf_models %>%
   dplyr::group_by(layer, model_name) %>%
   dplyr::summarise(
     model_summary = list(
-      broom::tidy(lm(cosine_similarity ~ numerosity_diff + area_diff, data = dplyr::cur_data()))
+      broom::tidy(lm(cosine_similarity_z ~ numerosity_diff_z + area_diff_z, data = dplyr::cur_data()))
     ),
-    r_squared = summary(lm(cosine_similarity ~ numerosity_diff + area_diff, data = dplyr::cur_data()))$r.squared
+    r_squared = summary(lm(cosine_similarity_z ~ numerosity_diff_z + area_diff_z, data = dplyr::cur_data()))$r.squared
   ) %>%
   dplyr::mutate(
-    numerosity_diff_coef = purrr::map_dbl(model_summary, ~ .x %>% dplyr::filter(term == "numerosity_diff") %>% dplyr::pull(estimate)),
-    numerosity_diff_se = purrr::map_dbl(model_summary, ~ .x %>% dplyr::filter(term == "numerosity_diff") %>% dplyr::pull(std.error)),
-    area_diff_coef = purrr::map_dbl(model_summary, ~ .x %>% dplyr::filter(term == "area_diff") %>% dplyr::pull(estimate)),
-    area_diff_se = purrr::map_dbl(model_summary, ~ .x %>% dplyr::filter(term == "area_diff") %>% dplyr::pull(std.error))
+    numerosity_diff_z_coef = purrr::map_dbl(model_summary, ~ .x %>% dplyr::filter(term == "numerosity_diff_z") %>% dplyr::pull(estimate)),
+    numerosity_diff_z_se = purrr::map_dbl(model_summary, ~ .x %>% dplyr::filter(term == "numerosity_diff_z") %>% dplyr::pull(std.error)),
+    area_diff_z_coef = purrr::map_dbl(model_summary, ~ .x %>% dplyr::filter(term == "area_diff_z") %>% dplyr::pull(estimate)),
+    area_diff_z_se = purrr::map_dbl(model_summary, ~ .x %>% dplyr::filter(term == "area_diff_z") %>% dplyr::pull(std.error))
   ) %>%
-  dplyr::select(layer, model_name, numerosity_diff_coef, numerosity_diff_se, area_diff_coef, area_diff_se, r_squared)
+  dplyr::select(layer, model_name, numerosity_diff_z_coef, numerosity_diff_z_se, area_diff_z_coef, area_diff_z_se, r_squared)
 
 results %>%
-  ggplot(aes(x = layer, y = numerosity_diff_coef, fill = model_name)) +
+  ggplot(aes(x = layer, y = numerosity_diff_z_coef, fill = model_name)) +
   geom_line(linetype = "dotted") +  # Lineplot for mean entropy
-  geom_ribbon(aes(ymin = numerosity_diff_coef - numerosity_diff_se, 
-                  ymax = numerosity_diff_coef + numerosity_diff_se),
+  geom_ribbon(aes(ymin = numerosity_diff_z_coef - numerosity_diff_z_se, 
+                  ymax = numerosity_diff_z_coef + numerosity_diff_z_se),
               alpha = 0.5,
               color = NA) +  # Shading for SE
   labs(
@@ -193,15 +209,15 @@ results %>%
   scale_x_continuous(limits = c(0, max(results$layer)),
                      breaks = seq(0, max(results$layer), 4)) +
   theme(text = element_text(size = 12),
-        legend.position = "bottom") +
-  scale_color_viridis(option = "mako", discrete=TRUE)
+        legend.position = "none") +
+  scale_color_viridis(option = "mako", discrete=TRUE) 
 
 
 results %>%
-  ggplot(aes(x = layer, y = area_diff_coef, fill = model_name)) +
+  ggplot(aes(x = layer, y = area_diff_z_coef, fill = model_name)) +
   geom_line(linetype = "dotted") +  # Lineplot for mean entropy
-  geom_ribbon(aes(ymin = area_diff_coef - area_diff_se, 
-                  ymax = area_diff_coef + area_diff_se),
+  geom_ribbon(aes(ymin = area_diff_z_coef - area_diff_z_se, 
+                  ymax = area_diff_z_coef + area_diff_z_se),
               alpha = 0.5,
               color = NA) +  # Shading for SE
   labs(
@@ -212,16 +228,17 @@ results %>%
   ) +
   theme_minimal() +
   scale_x_continuous(limits = c(0, max(results$layer)),
-                     breaks = seq(0, max(results$layer), 2)) +
-  theme(text = element_text(size = 15),
-        legend.position = "bottom") +
+                     breaks = seq(0, max(results$layer), 4)) +
+  theme(text = element_text(size = 12),
+        legend.position = "none") +
   scale_color_viridis(option = "mako", discrete=TRUE)
 
 
 
 m1 = lmer(data = df_hf_models,
-          cosine_similarity ~ area_diff * layer + numerosity_diff *layer + 
-            (1 | image_1) + (1 | image_2) + (1 | model_name))
+          cosine_similarity_z ~ area_diff_z * layer + numerosity_diff_z *layer + 
+            (1 | image_1) + (1 | image_2) + (1 | model_name) + (1 | image_type),
+          control=lmerControl(optimizer="bobyqa"))
 
 summary(m1)
 
@@ -235,10 +252,10 @@ results %>%
          prop_layer = layer / max_layer) %>%
   mutate(binned_prop_layer = ntile(prop_layer, 10)) %>%
   mutate(prop_binned = binned_prop_layer / 10) %>%
-  ggplot(aes(x = prop_binned, y = numerosity_diff_coef, fill = model_name)) +
+  ggplot(aes(x = prop_binned, y = numerosity_diff_z_coef, fill = model_name)) +
   geom_line(linetype = "dotted") +  # Lineplot for mean entropy
-  geom_ribbon(aes(ymin = numerosity_diff_coef - numerosity_diff_se, 
-                  ymax = numerosity_diff_coef + numerosity_diff_se),
+  geom_ribbon(aes(ymin = numerosity_diff_z_coef - numerosity_diff_z_se, 
+                  ymax = numerosity_diff_z_coef + numerosity_diff_z_se),
               alpha = 0.5,
               color = NA) +  # Shading for SE
   labs(
@@ -249,7 +266,7 @@ results %>%
   ) +
   theme_minimal() +
   theme(text = element_text(size = 15),
-        legend.position = "bottom") +
+        legend.position = "none") +
   scale_color_viridis(option = "mako", discrete=TRUE)
 
 
@@ -260,7 +277,7 @@ results %>%
          prop_layer = layer / max_layer) %>%
   mutate(binned_prop_layer = ntile(prop_layer, 10)) %>%
   mutate(prop_binned = binned_prop_layer / 10) %>%
-  ggplot(aes(x = prop_binned, y = numerosity_diff_coef)) +
+  ggplot(aes(x = prop_binned, y = numerosity_diff_z_coef)) +
   stat_summary(
     aes(group = model_name,
         color = model_name),  
@@ -286,7 +303,7 @@ results %>%
   ) +
   scale_color_viridis(option = "mako", discrete = TRUE) +
   theme(text = element_text(size = 15),
-        legend.position = "bottom") 
+        legend.position = "none") 
 
 results %>%
   mutate(model_type = case_when(
@@ -297,7 +314,7 @@ results %>%
          prop_layer = layer / max_layer) %>%
   mutate(binned_prop_layer = ntile(prop_layer, 10)) %>%
   mutate(prop_binned = binned_prop_layer / 10) %>%
-  ggplot(aes(x = prop_binned, y = numerosity_diff_coef)) +
+  ggplot(aes(x = prop_binned, y = numerosity_diff_z_coef)) +
   stat_summary(
     aes(group = model_type,
         color = model_type),  
@@ -372,13 +389,46 @@ df_summary %>%
 
 
 
+### NOTE: Interaction is robust to multiverse analysis
 m1 = lmer(data = filter(df_hf_models, layer == max_layer),
-          cosine_similarity ~ area_diff * model_type + numerosity_comparison_type * model_type + 
-            patch_size * numerosity_comparison_type  + # log_params * numerosity_comparison_type +
-            (1 | image_1) + (1 | image_2))
+          cosine_similarity ~ area_diff * model_type + 
+            numerosity_comparison_type * model_type + 
+            patch_size * numerosity_comparison_type  + 
+            (1 | image_1) + (1 | image_2) + (1|image_type) + (1|model_name))
 
 summary(m1)
 ```
+
+### Multiverse analysis
+
+The parameter estimate for the crucial interaction is negative even when other covariates and interactions are excluded. 
+
+```{r}
+m1 = lmer(data = filter(df_hf_models, layer == max_layer),
+          cosine_similarity ~ # area_diff * model_type + 
+            numerosity_comparison_type * model_type + 
+            patch_size * numerosity_comparison_type  + 
+            (1 | image_1) + (1 | image_2) + (1|image_type) + (1|model_name))
+
+summary(m1)
+
+m1 = lmer(data = filter(df_hf_models, layer == max_layer),
+          cosine_similarity ~ area_diff * model_type + 
+            numerosity_comparison_type * model_type + 
+            # patch_size * numerosity_comparison_type  + 
+            (1 | image_1) + (1 | image_2) + (1|image_type) + (1|model_name))
+
+summary(m1)
+
+m1 = lmer(data = filter(df_hf_models, layer == max_layer),
+          cosine_similarity ~ # area_diff * model_type + 
+            numerosity_comparison_type * model_type + 
+            # patch_size * numerosity_comparison_type  + 
+            (1 | image_1) + (1 | image_2) + (1|image_type) + (1|model_name))
+
+summary(m1)
+```
+
 
 ## Continuous
 
@@ -403,11 +453,42 @@ df_hf_models %>%
 
 m1 = lmer(data = filter(df_hf_models, layer == max_layer),
           cosine_similarity ~ area_diff * model_type + numerosity_diff * model_type + 
-            patch_size * numerosity_diff + # log_params * numerosity_diff +
-            (1 | image_1) + (1 | image_2))
+            patch_size * numerosity_diff + 
+            (1 | image_1) + (1 | image_2) + (1|image_type) + (1|model_name))
 
 summary(m1)
 
+```
+
+
+### Multiverse analysis
+
+The parameter estimate for the crucial interaction is positive even when other covariates and interactions are excluded. 
+
+```{r}
+m1 = lmer(data = filter(df_hf_models, layer == max_layer),
+          cosine_similarity ~ # area_diff * model_type + 
+            numerosity_diff * model_type + 
+            patch_size * numerosity_diff + 
+            (1 | image_1) + (1 | image_2) + (1|image_type) + (1|model_name))
+
+summary(m1)
+
+m1 = lmer(data = filter(df_hf_models, layer == max_layer),
+          cosine_similarity ~ area_diff * model_type + 
+            numerosity_diff * model_type + 
+            # patch_size * numerosity_diff + 
+            (1 | image_1) + (1 | image_2) + (1|image_type) + (1|model_name))
+
+summary(m1)
+
+m1 = lmer(data = filter(df_hf_models, layer == max_layer),
+          cosine_similarity ~ # area_diff * model_type + 
+            numerosity_diff * model_type + 
+            # patch_size * numerosity_diff + 
+            (1 | image_1) + (1 | image_2) + (1|image_type) + (1|model_name))
+
+summary(m1)
 ```
 
 
@@ -417,24 +498,25 @@ summary(m1)
 ### Need better way to calculate this, maybe by item?
 df_accuracy = df_hf_models %>%
   filter(layer == max_layer) %>% 
-  group_by(model_name, model_type, numerosity_comparison_type, image_1, 
+  group_by(model_name2, model_type, numerosity_comparison_type, image_1, 
            max_layer, n_params) %>%
   summarise(mean_cos_sim = mean(cosine_similarity)) %>%
   pivot_wider(names_from = numerosity_comparison_type, values_from = mean_cos_sim) %>%
   mutate(mean_diff = same - different,
          accurate = mean_diff > 0) %>%
-  group_by(model_name, model_type, 
+  group_by(model_name2, model_type, 
            max_layer, n_params) %>%
   summarise(accuracy = mean(accurate, na.rm = TRUE))
 
 df_accuracy %>%
   ggplot(aes(x = n_params,
              y = accuracy,
-             color = model_type)) +
+             color = model_type,
+             shape = model_type)) +
   geom_point(size = 6,
              alpha = .9) +
   scale_x_log10() +
-  geom_text_repel(aes(label=model_name), size=3) +
+  geom_text_repel(aes(label=model_name2), size=3) +
   labs(x = "Parameters",
        y = "Accuracy",
        color = "",
@@ -442,7 +524,7 @@ df_accuracy %>%
   theme_minimal() +
   # guides(color="none") +
   scale_color_viridis(option = "mako", discrete=TRUE) +
-  theme(text = element_text(size = 15),
+  theme(text = element_text(size = 12),
         legend.position="bottom")
   
 ```
