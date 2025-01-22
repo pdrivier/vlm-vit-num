@@ -51,7 +51,7 @@ def generate_imagepair_list(df, dpath):
 	return select_metadata, list_of_imagepair_names
 
 ## Load metadata (containing info about numerosity)
-image_type = "rectangles"
+image_type = "dots"
 dpath = "../vlm-vit-num-tmp/data/stimuli/{x}/".format(x=image_type)
 metadata = pd.read_csv(os.path.join(dpath,"metadata.csv"))
 
