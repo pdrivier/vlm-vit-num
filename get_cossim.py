@@ -60,7 +60,7 @@ MODELS = {
     # 'clip-huge-14': ['laion/CLIP-ViT-H-14-laion2B-s32B-b79K', CLIPModel, CLIPProcessor], 
     # 'clip-giant': ['laion/CLIP-ViT-g-14-laion2B-s12B-b42K', CLIPModel, CLIPProcessor], 
     # 'clip-big-giant': ['laion/CLIP-ViT-bigG-14-laion2B-39B-b160k', CLIPModel, CLIPProcessor], 
-    'vit-base-patch16-224-in21k':['google/vit-base-patch16-224-in21k',ViTModel, ViTImageProcessor], 
+    ### 'vit-base-patch16-224-in21k':['google/vit-base-patch16-224-in21k',ViTModel, ViTImageProcessor], ### Already ran
     ## 'vit-huge-patch14-224-in21k': ['google/vit-huge-patch14-224-in21k', ViTModel, ViTImageProcessor],
     ## 'vit-large-patch16-224-in21k': ['google/vit-large-patch16-224-in21k', ViTModel, ViTImageProcessor],
     ## 'vit-large-patch32-224-in21k': ['google/vit-large-patch32-224-in21k', ViTModel, ViTImageProcessor]

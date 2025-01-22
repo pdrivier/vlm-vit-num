@@ -99,8 +99,7 @@ df_hf_models %>%
 
 ```{r}
 df_summary <- df_hf_models %>%
-  mutate(area_diff_binned = ntile(area_diff, 4)) %>%
-  group_by(model_name, numerosity_comparison_type, layer, max_layer) %>%
+  group_by(model_name, numerosity_comparison_type, layer, max_layer, image_type) %>%
   summarize(avg_similarity = mean(cosine_similarity, na.rm = TRUE),
             se_similarity = sd(cosine_similarity, na.rm = TRUE) / sqrt(n()))
 
@@ -128,7 +127,8 @@ df_summary %>%
         legend.text = element_text(size = rel(1.2)),
         # legend.title = element_text(size = rel(1.5)),
         strip.text.x = element_text(size = rel(1.2)),
-        legend.position = "bottom")
+        legend.position = "bottom") +
+  facet_wrap(~image_type)
 
 m1 = lmer(data = df_hf_models,
           cosine_similarity ~ area_diff *layer + numerosity_comparison_type * layer + 
