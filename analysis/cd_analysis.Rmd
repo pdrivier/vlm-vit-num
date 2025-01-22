@@ -378,7 +378,7 @@ df_summary %>%
        y = "Average Cosine Similarity",
        color = "") +
   theme_minimal() +
-  scale_color_viridis(option = "mako", discrete=TRUE) +
+  scale_color_viridis(discrete=TRUE) +
   theme(axis.title = element_text(size=rel(1.2)),
         axis.text = element_text(size = rel(1.2)),
         legend.text = element_text(size = rel(1.2)),
