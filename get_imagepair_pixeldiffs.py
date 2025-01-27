@@ -9,7 +9,7 @@ import pandas as pd
 from get_image_pairs import generate_imagepair_list
 from PIL import Image
 
-image_type = "dots"
+image_type = "dots" #or "rectangles"
 dpath = "../vlm-vit-num-tmp/data/stimuli/{x}/".format(x=image_type)
 
 metadata = pd.read_csv(os.path.join(dpath,"metadata.csv"))
@@ -23,31 +23,35 @@ if os.path.exists(imagepair_filename):
 else:
     select_metadata, list_of_imagepair_names = generate_imagepair_list(metadata,dpath)
 
+gather_df= []
 for pair in list_of_imagepair_names:
-
 	image1_pix = Image.open(os.path.join(dpath,pair[0])).convert("RGB")
 	image2_pix = Image.open(os.path.join(dpath,pair[1])).convert("RGB")
-
 	## Check that images are the same size
 	if image1_pix.size != image2_pix.size:
 	    image2_pix = image2_pix.resize(image2_pix.size)
-
-	# Convert images to NumPy arrays
+	## Convert images to NumPy arrays
 	image1_array = np.array(image1_pix)
 	image2_array = np.array(image2_pix)
-
 	# Compute absolute differences between pixel values
 	difference = np.abs(image1_array - image2_array)
-
-	# Optionally, visualize the differences as an image
-	difference_image = Image.fromarray(difference.astype('uint8'))
-	difference_image.show()
-
+	## Optionally, visualize the differences as an image
+	# difference_image = Image.fromarray(difference.astype('uint8'))
+	# difference_image.show()
 	# For further analysis, compute statistics like mean difference
 	mean_difference = np.mean(difference)
-
 	## Store dataframe with average pixel differences pair image pair
-	d = {"image_1": pair[0],
+	d = {"image_type": image_type,
+		 "image_1": pair[0],
 		 "image_2": pair[1],
-		 "mean_pix_diff": mean_difference
-	}
+		 "mean_pix_diff": mean_difference}
+	gather_df.append(d)
+
+pixdiff_df = pd.DataFrame(gather_df)
+
+## Save the dataframes to csvs
+savepath = "image_properties/"
+filename = image_type + "-pixdiff.csv"
+if not os.path.exists(savepath): 
+    os.mkdir(savepath)
+pixdiff_df.to_csv(os.path.join(savepath, filename))
