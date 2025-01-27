@@ -38,7 +38,7 @@ def count_parameters(model):
    
 
 ## TODO: add an if statement to check for imagelist file's existence!
-image_type = "dots"
+image_type = "rectangles"
 ## TODO: test this!
 dpath = "../vlm-vit-num-tmp/data/stimuli/{x}/".format(x=image_type)
 
@@ -60,9 +60,9 @@ else:
 MODELS = {
     'clip-vit-base-patch32': ['openai/clip-vit-base-patch32', CLIPModel, CLIPProcessor], 
     'clip-vit-large-patch14': ['openai/clip-vit-large-patch14', CLIPModel, CLIPProcessor], 
-    'clip-huge-14': ['laion/CLIP-ViT-H-14-laion2B-s32B-b79K', CLIPModel, CLIPProcessor], 
-    'clip-giant': ['laion/CLIP-ViT-g-14-laion2B-s12B-b42K', CLIPModel, CLIPProcessor], 
-    'clip-big-giant': ['laion/CLIP-ViT-bigG-14-laion2B-39B-b160k', CLIPModel, CLIPProcessor], 
+    # 'clip-huge-14': ['laion/CLIP-ViT-H-14-laion2B-s32B-b79K', CLIPModel, CLIPProcessor], 
+    # 'clip-giant': ['laion/CLIP-ViT-g-14-laion2B-s12B-b42K', CLIPModel, CLIPProcessor], 
+    # 'clip-big-giant': ['laion/CLIP-ViT-bigG-14-laion2B-39B-b160k', CLIPModel, CLIPProcessor], 
     ### 'vit-base-patch16-224-in21k':['google/vit-base-patch16-224-in21k',ViTModel, ViTImageProcessor], ### Already ran
     ### 'vit-huge-patch14-224-in21k': ['google/vit-huge-patch14-224-in21k', ViTModel, ViTImageProcessor], ### Already ran
     ###'vit-large-patch16-224-in21k': ['google/vit-large-patch16-224-in21k', ViTModel, ViTImageProcessor], ### Already ran
@@ -70,8 +70,10 @@ MODELS = {
     }
 
 ## Set up results-gathering variable
-gather_df = []
+
 for mname, mspecs in MODELS.items(): 
+
+
     ## Load your processor and model
     mpath, mclass, mprocessor = mspecs
 
@@ -95,6 +97,11 @@ for mname, mspecs in MODELS.items():
     else: 
         nlayers = len(model.encoder.layer)
         patch_size = model.config.patch_size
+
+
+        ## Reset
+    gather_df = []
+    
 
     ## Iterate through the image pairs and get layerwise cosine distances
     for pair in tqdm(list_of_imagepair_names): 
