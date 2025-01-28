@@ -144,12 +144,78 @@ df_hf_models %>%
         legend.position="bottom") +
   facet_wrap(~image_type)
 
+### Overall sensitivity
 m1 = lmer(data = df_hf_models,
-          cosine_similarity_z ~ area_diff_z *layer + numerosity_comparison_type * layer + 
+          cosine_similarity ~ area_diff + numerosity_comparison_type + 
+            (1 | image_1) + (1 | image_2) + 
+            (1 |model_name) + (1|image_type),
+          control=lmerControl(optimizer="bobyqa"))
+
+summary(m1)
+
+
+### Interaction with layer
+m1 = lmer(data = df_hf_models,
+          cosine_similarity ~ area_diff *layer + numerosity_comparison_type * layer + 
             (1 | image_1) + (1 | image_2) + 
             (1 |model_name) + (1|image_type))
 
 summary(m1)
+
+
+## Plot differences by layer
+summary_df <- df_hf_models %>%
+  group_by(model_name, layer, numerosity_comparison_type) %>%
+  summarize(mean_cosine = mean(cosine_similarity, na.rm = TRUE), .groups = 'drop')
+
+# Step 2: Calculate difference between 'same' and 'different'
+difference_df <- summary_df %>%
+  pivot_wider(names_from = numerosity_comparison_type, values_from = mean_cosine) %>%
+  mutate(difference = same - different)
+
+difference_df %>%
+  ggplot(aes(x = layer, y = difference, color = model_name, group = model_name)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  labs(
+    title = "Average Difference in Cosine Similarity (Same - Different)",
+    x = "Layer",
+    y = "Average Difference",
+    color = "Model Name"
+  ) +
+  theme_minimal() +
+  scale_color_viridis(option = "mako", discrete=TRUE)  +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title = element_text(size = 12),
+    legend.title = element_text(size = 12)
+  )
+
+difference_df %>%
+  group_by(model_name) %>%
+  mutate(max_layer = max(layer),
+         prop_layer = layer / max_layer) %>%
+  mutate(binned_prop_layer = ntile(prop_layer, 10)) %>%
+  mutate(prop_binned = binned_prop_layer / 10) %>%
+  ggplot(aes(x = prop_binned, y = difference, color = model_name, group = model_name)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  labs(
+    title = "Average Difference in Cosine Similarity (Same - Different)",
+    x = "Layer Depth Ratio",
+    y = "Average Difference",
+    color = "Model Name"
+  ) +
+  theme_minimal() +
+  scale_color_viridis(option = "mako", discrete=TRUE)  +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title = element_text(size = 12),
+    legend.title = element_text(size = 12)
+  )
+
+
+
 ```
 
 
@@ -177,6 +243,40 @@ df_hf_models %>%
   theme(text = element_text(size = 12),
         legend.position = "bottom") +
   facet_wrap(~reorder(model_name2, n_params))
+
+
+
+### Overall sensitivity
+m1 = lmer(data = df_hf_models,
+          cosine_similarity ~ area_diff + numerosity_diff + 
+            (1 | image_1) + (1 | image_2) + 
+            (1 |model_name) + (1|image_type),
+          control=lmerControl(optimizer="bobyqa"))
+
+summary(m1)
+
+
+### Overall sensitivity
+m1 = lmer(data = filter(df_hf_models, layer == max_layer),
+          cosine_similarity ~ area_diff + numerosity_diff + 
+            (1 | image_1) + (1 | image_2) + 
+            (1 |model_name) + (1|image_type),
+          control=lmerControl(optimizer="bobyqa"))
+
+summary(m1)
+
+
+### Interaction
+m1 = lmer(data = df_hf_models,
+          cosine_similarity ~ area_diff * layer +  numerosity_diff * layer +
+            (1 | image_1) + (1 | image_2) + 
+            (1 |model_name) + (1|image_type),
+          control=lmerControl(optimizer="bobyqa"))
+
+summary(m1)
+
+
+
 
 ### Run lm by layer
 results <- df_hf_models %>%
