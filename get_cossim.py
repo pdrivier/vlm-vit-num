@@ -36,10 +36,8 @@ def count_parameters(model):
     # print(f"Total Trainable Params: {total_params}")
     return total_params
    
-
-## TODO: add an if statement to check for imagelist file's existence!
+## Grab the image pairs you have set up from running file ``get_image_pairs.py''
 image_type = "dots"
-## TODO: test this!
 dpath = "../vlm-vit-num-tmp/data/stimuli/{x}/".format(x=image_type)
 
 metadata = pd.read_csv(os.path.join(dpath,"metadata.csv"))
