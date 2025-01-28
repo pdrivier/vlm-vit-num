@@ -38,7 +38,7 @@ def count_parameters(model):
    
 
 ## TODO: add an if statement to check for imagelist file's existence!
-image_type = "rectangles"
+image_type = "dots"
 ## TODO: test this!
 dpath = "../vlm-vit-num-tmp/data/stimuli/{x}/".format(x=image_type)
 
@@ -58,15 +58,15 @@ else:
 
 ## Define the hugging face paths for models and corresponding image processors
 MODELS = {
-    'clip-vit-base-patch32': ['openai/clip-vit-base-patch32', CLIPModel, CLIPProcessor], 
-    'clip-vit-large-patch14': ['openai/clip-vit-large-patch14', CLIPModel, CLIPProcessor], 
-    # 'clip-huge-14': ['laion/CLIP-ViT-H-14-laion2B-s32B-b79K', CLIPModel, CLIPProcessor], 
-    # 'clip-giant': ['laion/CLIP-ViT-g-14-laion2B-s12B-b42K', CLIPModel, CLIPProcessor], 
-    # 'clip-big-giant': ['laion/CLIP-ViT-bigG-14-laion2B-39B-b160k', CLIPModel, CLIPProcessor], 
-    ### 'vit-base-patch16-224-in21k':['google/vit-base-patch16-224-in21k',ViTModel, ViTImageProcessor], ### Already ran
-    ### 'vit-huge-patch14-224-in21k': ['google/vit-huge-patch14-224-in21k', ViTModel, ViTImageProcessor], ### Already ran
-    ###'vit-large-patch16-224-in21k': ['google/vit-large-patch16-224-in21k', ViTModel, ViTImageProcessor], ### Already ran
-    ### 'vit-large-patch32-224-in21k': ['google/vit-large-patch32-224-in21k', ViTModel, ViTImageProcessor]### Already ran
+    # 'clip-base-patch32': ['laion/CLIP-ViT-B-32-laion2B-s34B-b79K', CLIPModel, CLIPProcessor], 
+    # 'clip-large-patch14': ['laion/CLIP-ViT-L-14-laion2B-s32B-b82K', CLIPModel, CLIPProcessor], 
+    # 'clip-huge-patch14': ['laion/CLIP-ViT-H-14-laion2B-s32B-b79K', CLIPModel, CLIPProcessor], 
+    # 'clip-giant-patch14': ['laion/CLIP-ViT-g-14-laion2B-s12B-b42K', CLIPModel, CLIPProcessor], 
+    # 'clip-bg-patch14': ['laion/CLIP-ViT-bigG-14-laion2B-39B-b160k', CLIPModel, CLIPProcessor], 
+     # 'vit-base-patch16':['google/vit-base-patch16-224-in21k',ViTModel, ViTImageProcessor], ### Already ran
+     # 'vit-huge-patch14': ['google/vit-huge-patch14-224-in21k', ViTModel, ViTImageProcessor], ### Already ran
+     'vit-large-patch16': ['google/vit-large-patch16-224-in21k', ViTModel, ViTImageProcessor], 
+     'vit-large-patch32': ['google/vit-large-patch32-224-in21k', ViTModel, ViTImageProcessor]
     }
 
 ## Set up results-gathering variable
