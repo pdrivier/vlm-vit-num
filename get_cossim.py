@@ -58,15 +58,15 @@ else:
 
 ## Define the hugging face paths for models and corresponding image processors
 MODELS = {
-    # 'clip-base-patch32': ['laion/CLIP-ViT-B-32-laion2B-s34B-b79K', CLIPModel, CLIPProcessor], 
-    # 'clip-large-patch14': ['laion/CLIP-ViT-L-14-laion2B-s32B-b82K', CLIPModel, CLIPProcessor], 
-    # 'clip-huge-patch14': ['laion/CLIP-ViT-H-14-laion2B-s32B-b79K', CLIPModel, CLIPProcessor], 
-    # 'clip-giant-patch14': ['laion/CLIP-ViT-g-14-laion2B-s12B-b42K', CLIPModel, CLIPProcessor], 
-    # 'clip-bg-patch14': ['laion/CLIP-ViT-bigG-14-laion2B-39B-b160k', CLIPModel, CLIPProcessor], 
+    #  'clip-base-patch32': ['laion/CLIP-ViT-B-32-laion2B-s34B-b79K', CLIPModel, CLIPProcessor], ### Already ran
+    # 'clip-large-patch14': ['laion/CLIP-ViT-L-14-laion2B-s32B-b82K', CLIPModel, CLIPProcessor], ### Already ran
+    'clip-huge-patch14': ['laion/CLIP-ViT-H-14-laion2B-s32B-b79K', CLIPModel, CLIPProcessor], 
+    'clip-giant-patch14': ['laion/CLIP-ViT-g-14-laion2B-s12B-b42K', CLIPModel, CLIPProcessor], 
+    'clip-bg-patch14': ['laion/CLIP-ViT-bigG-14-laion2B-39B-b160k', CLIPModel, CLIPProcessor], 
      # 'vit-base-patch16':['google/vit-base-patch16-224-in21k',ViTModel, ViTImageProcessor], ### Already ran
      # 'vit-huge-patch14': ['google/vit-huge-patch14-224-in21k', ViTModel, ViTImageProcessor], ### Already ran
-     'vit-large-patch16': ['google/vit-large-patch16-224-in21k', ViTModel, ViTImageProcessor], 
-     'vit-large-patch32': ['google/vit-large-patch32-224-in21k', ViTModel, ViTImageProcessor]
+     # 'vit-large-patch16': ['google/vit-large-patch16-224-in21k', ViTModel, ViTImageProcessor], ### Already ran
+     # 'vit-large-patch32': ['google/vit-large-patch32-224-in21k', ViTModel, ViTImageProcessor]### Already ran
     }
 
 ## Set up results-gathering variable
