@@ -168,51 +168,41 @@ summary_df <- df_hf_models %>%
   group_by(model_name, layer, numerosity_comparison_type) %>%
   summarize(mean_cosine = mean(cosine_similarity, na.rm = TRUE), .groups = 'drop')
 
-# Step 2: Calculate difference between 'same' and 'different'
 difference_df <- summary_df %>%
   pivot_wider(names_from = numerosity_comparison_type, values_from = mean_cosine) %>%
-  mutate(difference = same - different)
-
-difference_df %>%
-  ggplot(aes(x = layer, y = difference, color = model_name, group = model_name)) +
-  geom_line(size = 1) +
-  geom_point(size = 2) +
-  labs(
-    title = "Average Difference in Cosine Similarity (Same - Different)",
-    x = "Layer",
-    y = "Average Difference",
-    color = "Model Name"
-  ) +
-  theme_minimal() +
-  scale_color_viridis(option = "mako", discrete=TRUE)  +
-  theme(
-    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
-    axis.title = element_text(size = 12),
-    legend.title = element_text(size = 12)
-  )
-
-difference_df %>%
+  mutate(difference = same - different) %>%
   group_by(model_name) %>%
   mutate(max_layer = max(layer),
          prop_layer = layer / max_layer) %>%
   mutate(binned_prop_layer = ntile(prop_layer, 10)) %>%
-  mutate(prop_binned = binned_prop_layer / 10) %>%
-  ggplot(aes(x = prop_binned, y = difference, color = model_name, group = model_name)) +
-  geom_line(size = 1) +
-  geom_point(size = 2) +
+  mutate(prop_binned = binned_prop_layer / 10) 
+
+
+smoothed_data <- difference_df %>%
+  group_by(prop_binned) %>%
+  summarize(avg_difference = mean(difference, na.rm = TRUE)) %>%
+  mutate(model_name = "Average")
+
+# Create the plot
+difference_df %>%
+  ggplot(aes(x = prop_binned, y = difference, 
+             color = model_name, group = model_name)) +
+  geom_line(alpha = 0.5) + # Individual lines for each model_name
+  geom_line(data = smoothed_data, aes(x = prop_binned, y = avg_difference), 
+             color = "black", size = 1.2) + # Smoothed average
   labs(
-    title = "Average Difference in Cosine Similarity (Same - Different)",
+    title = "",
     x = "Layer Depth Ratio",
-    y = "Average Difference",
-    color = "Model Name"
+    y = "Difference (Same - Different)",
+    color = ""
   ) +
   theme_minimal() +
   scale_color_viridis(option = "mako", discrete=TRUE)  +
   theme(
     plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
     axis.title = element_text(size = 12),
-    legend.title = element_text(size = 12)
-  )
+    legend.title = element_text(size = 12),
+    legend.position = "none")
 
 
 
@@ -277,109 +267,6 @@ summary(m1)
 
 
 
-
-### Run lm by layer
-results <- df_hf_models %>%
-  dplyr::group_by(layer, model_name) %>%
-  dplyr::summarise(
-    model_summary = list(
-      broom::tidy(lm(cosine_similarity_z ~ numerosity_diff_z + area_diff_z, data = dplyr::cur_data()))
-    ),
-    r_squared = summary(lm(cosine_similarity_z ~ numerosity_diff_z + area_diff_z, data = dplyr::cur_data()))$r.squared
-  ) %>%
-  dplyr::mutate(
-    numerosity_diff_z_coef = purrr::map_dbl(model_summary, ~ .x %>% dplyr::filter(term == "numerosity_diff_z") %>% dplyr::pull(estimate)),
-    numerosity_diff_z_se = purrr::map_dbl(model_summary, ~ .x %>% dplyr::filter(term == "numerosity_diff_z") %>% dplyr::pull(std.error)),
-    area_diff_z_coef = purrr::map_dbl(model_summary, ~ .x %>% dplyr::filter(term == "area_diff_z") %>% dplyr::pull(estimate)),
-    area_diff_z_se = purrr::map_dbl(model_summary, ~ .x %>% dplyr::filter(term == "area_diff_z") %>% dplyr::pull(std.error))
-  ) %>%
-  dplyr::select(layer, model_name, numerosity_diff_z_coef, numerosity_diff_z_se, area_diff_z_coef, area_diff_z_se, r_squared)
-
-results %>%
-  ggplot(aes(x = layer, y = numerosity_diff_z_coef, fill = model_name)) +
-  geom_line(linetype = "dotted") +  # Lineplot for mean entropy
-  geom_ribbon(aes(ymin = numerosity_diff_z_coef - numerosity_diff_z_se, 
-                  ymax = numerosity_diff_z_coef + numerosity_diff_z_se),
-              alpha = 0.5,
-              color = NA) +  # Shading for SE
-  labs(
-    title = "",
-    x = "Layer",
-    y = "Coefficient (Numerosity)",
-    fill = "",
-  ) +
-  theme_minimal() +
-  scale_x_continuous(limits = c(0, max(results$layer)),
-                     breaks = seq(0, max(results$layer), 4)) +
-  theme(text = element_text(size = 12),
-        legend.position = "none") +
-  scale_fill_viridis(option = "mako", discrete=TRUE) 
-
-
-
-results %>%
-  ggplot(aes(x = layer, y = area_diff_z_coef, fill = model_name)) +
-  geom_line(linetype = "dotted") +  # Lineplot for mean entropy
-  geom_ribbon(aes(ymin = area_diff_z_coef - area_diff_z_se, 
-                  ymax = area_diff_z_coef + area_diff_z_se),
-              alpha = 0.5,
-              color = NA) +  # Shading for SE
-  labs(
-    title = "",
-    x = "Layer",
-    y = "Coefficient (Area)",
-    fill = "",
-  ) +
-  theme_minimal() +
-  scale_x_continuous(limits = c(0, max(results$layer)),
-                     breaks = seq(0, max(results$layer), 4)) +
-  theme(text = element_text(size = 12),
-        legend.position = "none") +
-  scale_fill_viridis(option = "mako", discrete=TRUE) 
-
-
-
-
-
-### Layer depth ratio
-
-
-results %>%
-  mutate(model_type = case_when(
-    str_detect(model_name, "clip") == TRUE ~ "VLM",
-    TRUE ~ "ViT")) %>%
-  group_by(model_type) %>%
-  mutate(max_layer = max(layer),
-         prop_layer = layer / max_layer) %>%
-  mutate(binned_prop_layer = ntile(prop_layer, 10)) %>%
-  mutate(prop_binned = binned_prop_layer / 10) %>%
-  ggplot(aes(x = prop_binned, y = numerosity_diff_z_coef)) +
-  stat_summary(
-    aes(group = model_type,
-        color = model_type),  
-    fun = mean,    
-    geom = "line",        
-    size = 2              
-  ) +
-  stat_summary(
-    aes(group = model_type, 
-        fill = model_type), 
-    fun.data = mean_se,    
-    geom = "ribbon",  
-    alpha = 0.2,   
-    color = NA     
-  ) +
-  theme_minimal() +
-  labs(
-    title = "",
-    x = "Layer Depth",
-    y = "Coefficient (Numerosity)",
-    fill = "",
-    color = "",
-  ) +
-  scale_color_viridis(option = "mako", discrete = TRUE) +
-  theme(text = element_text(size = 15),
-        legend.position = "bottom") 
 
 ```
 
