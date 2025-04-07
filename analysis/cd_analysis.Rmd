@@ -25,6 +25,7 @@ library(broom)
 library(lme4)
 library(ggridges)
 library(lmerTest)
+library(broom)
 library(broom.mixed)
 library(ggrepel)
 library(tools)
@@ -33,7 +34,7 @@ library(viridis)
 library(ggcorrplot)
 
 all_colors <- viridis::viridis(10, option = "mako")
-my_colors <- all_colors[c(3, 5, 7)]  # Selecting specific colors from the palette
+my_colors <- all_colors[c(5, 7)]  # Selecting specific colors from the palette
 ```
 
 
@@ -187,9 +188,9 @@ smoothed_data <- difference_df %>%
 difference_df %>%
   ggplot(aes(x = prop_binned, y = difference, 
              color = model_name, group = model_name)) +
-  geom_line(alpha = 0.5) + # Individual lines for each model_name
+  geom_line(alpha = 0.5, size=2) + # Individual lines for each model_name
   geom_line(data = smoothed_data, aes(x = prop_binned, y = avg_difference), 
-             color = "black", size = 1.2) + # Smoothed average
+             color = "black", size = 3) + # Smoothed average
   labs(
     title = "",
     x = "Layer Depth Ratio",
@@ -197,7 +198,7 @@ difference_df %>%
     color = ""
   ) +
   theme_minimal() +
-  scale_color_viridis(option = "mako", discrete=TRUE)  +
+  scale_color_manual(values = viridisLite::viridis(9, option = "mako", begin = 0, end = 0.8))  +
   theme(
     plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
     axis.title = element_text(size = 12),
@@ -224,7 +225,7 @@ df_hf_models %>%
   geom_point(alpha = .5) +
   geom_smooth(method = "lm") +
   theme_minimal() +
-  scale_color_viridis(option = "mako", discrete=TRUE) +
+  scale_color_manual(values = viridisLite::viridis(2, option = "mako", begin = 0, end = 0.8)) +
   labs(# title = "",
        x = "Numerosity Difference",
        y = "Cosine Similarity",
@@ -294,17 +295,18 @@ df_summary %>%
   ggplot(aes(x = factor(model_type),
              y = avg_similarity,
              color = numerosity_comparison_type)) +
-  geom_point(position = position_dodge(width = 0.5), size = 2) +  
+  geom_point(position = position_dodge(width = 0.5), size = 6) +  
   geom_errorbar(aes(ymin = avg_similarity - 2 * se_similarity, 
                     ymax = avg_similarity + 2 * se_similarity), 
-                width = 0.2,
+                width = 0.6,
+                size = 2,
                 position = position_dodge(width = 0.5)) + 
   labs(# title = "",
        x = "Model Type",
        y = "Average Cosine Similarity",
        color = "") +
   theme_minimal() +
-  scale_color_viridis(discrete=TRUE) +
+  scale_color_manual(values = viridisLite::viridis(2, option = "mako", begin = 0, end = 0.8)) +
   theme(axis.title = element_text(size=rel(1.2)),
         axis.text = element_text(size = rel(1.2)),
         legend.text = element_text(size = rel(1.2)),
@@ -389,11 +391,10 @@ df_hf_models %>%
   labs(x = "Numerosity Difference",
        y = "Cosine Similarity",
        color = "") +
-  scale_color_viridis(option = "mako", discrete=TRUE) +
+    scale_color_manual(values = viridisLite::viridis(2, option = "mako", begin = 0, end = 0.8)) +
   theme(text = element_text(size = 15),
         legend.position = "bottom") +
   facet_wrap(~model_type)
-
 
 
 df_hf_models_last = df_hf_models %>%
@@ -418,6 +419,26 @@ m_reduced = lmer(data = df_hf_models_last,
 
 df_hf_models_last$resid = residuals(m_reduced)
 
+# Get the slopes for the line describing residuals v. numerosity difference
+
+
+slopes <- df_hf_models_last %>%
+  group_by(model_type) %>%
+  nest() %>%
+  mutate(
+    model = map(data, ~ lm(resid ~ numerosity_diff, data = .x)),
+    tidied = map(model, tidy)
+  ) %>%
+  unnest(tidied) %>%
+  filter(term == "numerosity_diff") %>%
+  select(model_type, estimate) %>%
+  mutate(label = paste0("B = ", round(estimate, 5)))
+
+slopes <- slopes %>%
+  mutate(x = 0,    # Adjust as needed
+         y = max(df_hf_models_last$resid, na.rm = TRUE))  # Top of panel
+
+
 df_hf_models_last %>%
   ggplot(aes(x = numerosity_diff,
              y = resid,
@@ -428,10 +449,16 @@ df_hf_models_last %>%
   labs(x = "Numerosity Difference",
        y = "Residuals",
        color = "") +
-  scale_color_viridis(option = "mako", discrete=TRUE) +
+  scale_color_manual(values = viridisLite::viridis(2, option = "mako", begin = 0, end = 0.8)) +
   theme(text = element_text(size = 15),
         legend.position = "bottom") +
-  facet_wrap(~model_type)
+  facet_wrap(~model_type) + 
+  geom_text(data = slopes,
+            aes(x = x, y = y, label = label),
+            hjust = -1,
+            inherit.aes = FALSE,
+            size = 5)
+
 
 ```
 
