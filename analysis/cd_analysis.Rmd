@@ -67,6 +67,18 @@ table(df_hf_models$model_name)
 table(df_hf_models$model_name, df_hf_models$numerosity_comparison_type)
 table(df_hf_models$model_name, df_hf_models$image_type)
 
+
+## Take a look again at the rescaled area differences
+df_hf_models %>% 
+  ggplot(aes(x = area_diff,
+             y = cosine_similarity,
+             color = model_type)) + 
+  geom_point(alpha=0.1) + 
+  geom_smooth(method = "lm", se = FALSE) +
+  theme_minimal() +
+  scale_color_manual(values = viridisLite::viridis(2, option = "mako", begin = 0, end = 0.8)) +
+  facet_wrap(~model_type) 
+
 ```
 
 
@@ -188,9 +200,9 @@ smoothed_data <- difference_df %>%
 difference_df %>%
   ggplot(aes(x = prop_binned, y = difference, 
              color = model_name, group = model_name)) +
-  geom_line(alpha = 0.5, size=2) + # Individual lines for each model_name
+  geom_line(alpha = 0.5, linewidth=2) + # Individual lines for each model_name
   geom_line(data = smoothed_data, aes(x = prop_binned, y = avg_difference), 
-             color = "black", size = 3) + # Smoothed average
+             color = "black", linewidth = 3) + # Smoothed average
   labs(
     title = "",
     x = "Layer Depth Ratio",
@@ -206,6 +218,50 @@ difference_df %>%
     legend.position = "none")
 
 
+## Visualize area difference interaction with layer 
+ggplot(df_hf_models, aes(x = area_diff, y = cosine_similarity, color = as.factor(layer))) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~ model_name) +
+  scale_color_manual(values = viridisLite::viridis(50, option = "mako", begin = 0, end = 0.8)) +
+  labs(
+    title = "Interaction between Area Difference and Layer",
+    x = "Area Difference",
+    y = "Cosine Similarity",
+    color = "Layer"
+  ) +
+  theme_minimal()
+
+## Subset by image type, to check that area diffs above are capturing 
+#  the within-image-type area difference variation
+# Rectangles
+df_hf_models %>%
+  filter(image_type == "rectangles") %>%
+  ggplot(aes(x = area_diff, y = cosine_similarity, color = as.factor(layer))) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~ model_name) +
+  scale_color_manual(values = viridisLite::viridis(50, option = "mako", begin = 0, end = 0.8)) +
+  labs(
+    title = "Rectangles - Interaction between Area Difference and Layer",
+    x = "Area Difference",
+    y = "Cosine Similarity",
+    color = "Layer"
+  ) +
+  theme_minimal()
+
+# Dots
+df_hf_models %>%
+  filter(image_type == "dots") %>%
+  ggplot(aes(x = area_diff, y = cosine_similarity, color = as.factor(layer))) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~ model_name) +
+  scale_color_manual(values = viridisLite::viridis(50, option = "mako", begin = 0, end = 0.8)) +
+  labs(
+    title = "Dots - Interaction between Area Difference and Layer",
+    x = "Area Difference",
+    y = "Cosine Similarity",
+    color = "Layer"
+  ) +
+  theme_minimal()
 
 ```
 
@@ -236,8 +292,7 @@ df_hf_models %>%
   facet_wrap(~reorder(model_name2, n_params))
 
 
-
-### Overall sensitivity
+### Overall sensitivity, all layers
 m1 = lmer(data = df_hf_models,
           cosine_similarity ~ area_diff + numerosity_diff + 
             (1 | image_1) + (1 | image_2) + 
@@ -247,7 +302,7 @@ m1 = lmer(data = df_hf_models,
 summary(m1)
 
 
-### Overall sensitivity
+### Overall sensitivity, at the last layer
 m1 = lmer(data = filter(df_hf_models, layer == max_layer),
           cosine_similarity ~ area_diff + numerosity_diff + 
             (1 | image_1) + (1 | image_2) + 
@@ -257,7 +312,7 @@ m1 = lmer(data = filter(df_hf_models, layer == max_layer),
 summary(m1)
 
 
-### Interaction
+### Interactions with layer
 m1 = lmer(data = df_hf_models,
           cosine_similarity ~ area_diff * layer +  numerosity_diff * layer +
             (1 | image_1) + (1 | image_2) + 
@@ -271,6 +326,28 @@ summary(m1)
 
 ```
 
+## Continuous function of numerosity: ratio
+```{r}
+df_hf_models$numerosity_ratio <- df_hf_models$numerosity_1 / df_hf_models$numerosity_2
+
+df_hf_models %>%
+  ggplot(aes(x = numerosity_ratio)) + 
+  geom_histogram(alpha = .6) +
+  theme_minimal() 
+
+mnumrat = lmer(data = df_hf_models, 
+                cosine_similarity ~ 
+                  area_diff * model_type + 
+                  numerosity_ratio * model_type + 
+                  patch_size + log_params + 
+                  (1 | image_1) + (1 | image_2) + 
+                  (1 | image_type) + (1 | model_name)
+                  )
+
+summary(mnumrat)
+
+
+```
 
 # VLM vs. ViT
 
@@ -316,7 +393,6 @@ df_summary %>%
 
 
 
-
 m1 = lmer(data = filter(df_hf_models, layer == max_layer),
           cosine_similarity ~ area_diff * model_type + 
             numerosity_comparison_type * model_type + 
@@ -339,7 +415,7 @@ m1 = lmer(data = filter(df_hf_models, layer == max_layer),
             numerosity_comparison_type * model_type + 
             patch_size * numerosity_comparison_type  + 
             log_params * numerosity_comparison_type +
-            (1 | image_1) + (1 | image_2) + # (1|image_type) +
+            (1 | image_1) + (1 | image_2) + (1|image_type) +
             (1|model_name))
 
 summary(m1)
@@ -349,7 +425,7 @@ m1 = lmer(data = filter(df_hf_models, layer == max_layer),
             numerosity_comparison_type * model_type + 
             # patch_size * numerosity_comparison_type  + 
             log_params * numerosity_comparison_type +
-            (1 | image_1) + (1 | image_2) + # (1|image_type) + 
+            (1 | image_1) + (1 | image_2) + (1|image_type) + 
             (1|model_name))
 
 summary(m1)
@@ -359,7 +435,7 @@ m1 = lmer(data = filter(df_hf_models, layer == max_layer),
             numerosity_comparison_type * model_type + 
             # patch_size * numerosity_comparison_type  +
             log_params * numerosity_comparison_type +
-            (1 | image_1) + (1 | image_2) + # (1|image_type) + 
+            (1 | image_1) + (1 | image_2) + (1|image_type) + 
             (1|model_name))
 
 summary(m1)
@@ -369,7 +445,7 @@ m1 = lmer(data = filter(df_hf_models, layer == max_layer),
             numerosity_comparison_type * model_type + 
             patch_size * numerosity_comparison_type  +
             # log_params * numerosity_comparison_type +
-            (1 | image_1) + (1 | image_2) + # (1|image_type) +
+            (1 | image_1) + (1 | image_2) + (1|image_type) +
             (1|model_name))
 
 summary(m1)
@@ -432,7 +508,7 @@ slopes <- df_hf_models_last %>%
   unnest(tidied) %>%
   filter(term == "numerosity_diff") %>%
   select(model_type, estimate) %>%
-  mutate(label = paste0("B = ", round(estimate, 5)))
+  mutate(label = paste0("B = ", round(estimate, 6)))
 
 slopes <- slopes %>%
   mutate(x = 0,    # Adjust as needed
@@ -473,7 +549,7 @@ m1 = lmer(data = filter(df_hf_models, layer == max_layer),
             numerosity_diff * model_type + 
             patch_size * numerosity_diff + 
             log_params * numerosity_diff +
-            (1 | image_1) + (1 | image_2) + # (1|image_type) + 
+            (1 | image_1) + (1 | image_2) + (1|image_type) + 
             (1|model_name))
 
 summary(m1)
@@ -483,7 +559,7 @@ m1 = lmer(data = filter(df_hf_models, layer == max_layer),
             numerosity_diff * model_type + 
             # patch_size * numerosity_diff + 
             log_params * numerosity_diff +
-            (1 | image_1) + (1 | image_2) + # (1|image_type) + 
+            (1 | image_1) + (1 | image_2) + (1|image_type) + 
             (1|model_name))
 
 summary(m1)
@@ -493,7 +569,7 @@ m1 = lmer(data = filter(df_hf_models, layer == max_layer),
             numerosity_diff * model_type + 
             # patch_size * numerosity_diff + 
             log_params * numerosity_diff +
-            (1 | image_1) + (1 | image_2) + # (1|image_type) + 
+            (1 | image_1) + (1 | image_2) + (1|image_type) + 
             (1|model_name))
 
 summary(m1)
@@ -503,10 +579,249 @@ m1 = lmer(data = filter(df_hf_models, layer == max_layer),
             numerosity_diff * model_type + 
              patch_size * numerosity_diff + 
             # log_params * numerosity_diff +
-            (1 | image_1) + (1 | image_2) + # (1|image_type) + 
+            (1 | image_1) + (1 | image_2) + (1|image_type) + 
             (1|model_name))
 
 summary(m1)
 ```
 
+## Residuals by Area Difference
 
+```{r}
+## All image types included
+df_hf_models %>%
+  filter(layer == max_layer) %>%
+  ggplot(aes(x = area_diff,
+             y = cosine_similarity,
+             color = model_type)) +
+  geom_point(alpha = .5) +
+  geom_smooth(method = "lm") +
+  theme_minimal() +
+  labs(x = "Area Difference",
+       y = "Cosine Similarity",
+       color = "") +
+    scale_color_manual(values = viridisLite::viridis(2, option = "mako", begin = 0, end = 0.8)) +
+  theme(text = element_text(size = 15),
+        legend.position = "bottom") +
+  facet_wrap(~model_type)
+  
+
+### For visualizing, remove key factors from model 
+m_reduced = lmer(data = df_hf_models,
+          cosine_similarity ~ numerosity_diff * model_type + #area_diff + #  + 
+            patch_size + # log_params * numerosity_diff +
+            (1 | image_1) + (1 | image_2) + (1 | image_type) +
+            (1|model_name))
+
+df_hf_models$resid = residuals(m_reduced)
+
+# Get the slopes for the line describing residuals v. area difference
+slopes <- df_hf_models %>%
+  group_by(model_type) %>%
+  nest() %>%
+  mutate(
+    model = map(data, ~ lm(resid ~ area_diff, data = .x)),
+    tidied = map(model, tidy)
+  ) %>%
+  unnest(tidied) %>%
+  filter(term == "area_diff") %>%
+  select(model_type, estimate) %>%
+  mutate(label = paste0("B = ", round(estimate, 5)))
+
+slopes <- slopes %>%
+  mutate(x = 0,    # Adjust as needed
+         y = max(df_hf_models$resid, na.rm = TRUE))  # Top of panel
+
+
+df_hf_models %>%
+  ggplot(aes(x = area_diff,
+             y = resid,
+             color = model_type)) +
+  geom_point(alpha = .1) +
+  geom_smooth(method = "lm") +
+  theme_minimal() +
+  labs(x = "Area Difference",
+       y = "Residuals",
+       title = "All image types",
+       color = "") +
+  scale_color_manual(values = viridisLite::viridis(2, option = "mako", begin = 0, end = 0.8)) +
+  theme(text = element_text(size = 15),
+        legend.position = "bottom") +
+  facet_wrap(~model_type) + 
+  geom_text(data = slopes,
+            aes(x = x, y = y, label = label),
+            hjust = -1,
+            inherit.aes = FALSE,
+            size = 5)
+
+m = lmer(data = df_hf_models,
+          cosine_similarity ~ area_diff * model_type + numerosity_diff * model_type + 
+            patch_size * numerosity_diff + log_params * numerosity_diff +
+            (1 | image_1) + (1 | image_2) + (1 | image_type) + 
+            (1|model_name))
+
+summary(m)
+
+
+## RECTANGLES
+
+df_rectangles <- df_hf_models %>%
+  filter(layer == max_layer) %>%
+  filter(image_type == "rectangles")
+
+df_rectangles %>%
+  ggplot(aes(x = area_diff,
+             y = cosine_similarity,
+             color = model_type)) +
+  geom_point(alpha = .5) +
+  geom_smooth(method = "lm") +
+  theme_minimal() +
+  labs(x = "Area Difference (z-scored)",
+       y = "Cosine Similarity",
+       color = "") +
+    scale_color_manual(values = viridisLite::viridis(2, option = "mako", begin = 0, end = 0.8)) +
+  theme(text = element_text(size = 15),
+        legend.position = "bottom") +
+  facet_wrap(~model_type)
+
+
+### For visualizing, remove key factors from model 
+m_reduced_rectangles = lmer(data = df_rectangles,
+          cosine_similarity ~ numerosity_diff * model_type + #area_diff + #  + 
+            patch_size + # log_params * numerosity_diff +
+            (1 | image_1) + (1 | image_2) + 
+            (1|model_name))
+
+df_rectangles$resid = residuals(m_reduced_rectangles)
+
+# Get the slopes for the line describing residuals v. area difference
+slopes <- df_rectangles %>%
+  group_by(model_type) %>%
+  nest() %>%
+  mutate(
+    model = map(data, ~ lm(resid ~ area_diff, data = .x)),
+    tidied = map(model, tidy)
+  ) %>%
+  unnest(tidied) %>%
+  filter(term == "area_diff") %>%
+  select(model_type, estimate) %>%
+  mutate(label = paste0("B = ", round(estimate, 5)))
+
+slopes <- slopes %>%
+  mutate(x = 0,    # Adjust as needed
+         y = max(df_rectangles$resid, na.rm = TRUE))  # Top of panel
+
+
+df_rectangles %>%
+  ggplot(aes(x = area_diff,
+             y = resid,
+             color = model_type)) +
+  geom_point(alpha = .1) +
+  geom_smooth(method = "lm") +
+  theme_minimal() +
+  labs(x = "Area Difference",
+       y = "Residuals",
+       title = "Rectangles",
+       color = "") +
+  scale_color_manual(values = viridisLite::viridis(2, option = "mako", begin = 0, end = 0.8)) +
+  theme(text = element_text(size = 15),
+        legend.position = "bottom") +
+  facet_wrap(~model_type) + 
+  geom_text(data = slopes,
+            aes(x = x, y = y, label = label),
+            hjust = -1,
+            inherit.aes = FALSE,
+            size = 5)
+
+
+mrectangles = lmer(data = df_rectangles,
+          cosine_similarity ~ area_diff * model_type + numerosity_diff * model_type + 
+            patch_size * numerosity_diff + log_params * numerosity_diff +
+            (1 | image_1) + (1 | image_2) + 
+            (1|model_name))
+
+summary(mrectangles)
+
+
+### DOTS
+
+df_dots <- df_hf_models %>%
+  filter(layer == max_layer) %>%
+  filter(image_type == "dots")
+
+df_dots %>%
+  ggplot(aes(x = area_diff,
+             y = cosine_similarity,
+             color = model_type)) +
+  geom_point(alpha = .5) +
+  geom_smooth(method = "lm") +
+  theme_minimal() +
+  labs(x = "Area Difference",
+       y = "Cosine Similarity",
+       title = "Dots",
+       color = "") +
+    scale_color_manual(values = viridisLite::viridis(2, option = "mako", begin = 0, end = 0.8)) +
+  theme(text = element_text(size = 15),
+        legend.position = "bottom") +
+  facet_wrap(~model_type)
+
+
+### For visualizing, remove key factors from model 
+m_reduced_dots = lmer(data = df_dots,
+          cosine_similarity ~ numerosity_diff * model_type + #area_diff + #  + 
+            patch_size + # log_params * numerosity_diff +
+            (1 | image_1) + (1 | image_2) + 
+            (1|model_name))
+
+df_dots$resid = residuals(m_reduced_dots)
+
+# Get the slopes for the line describing residuals v. area difference
+slopes <- df_dots %>%
+  group_by(model_type) %>%
+  nest() %>%
+  mutate(
+    model = map(data, ~ lm(resid ~ area_diff, data = .x)),
+    tidied = map(model, tidy)
+  ) %>%
+  unnest(tidied) %>%
+  filter(term == "area_diff") %>%
+  select(model_type, estimate) %>%
+  mutate(label = paste0("B = ", round(estimate, 5)))
+
+slopes <- slopes %>%
+  mutate(x = 0,    # Adjust as needed
+         y = max(df_dots$resid, na.rm = TRUE))  # Top of panel
+
+
+df_dots %>%
+  ggplot(aes(x = area_diff,
+             y = resid,
+             color = model_type)) +
+  geom_point(alpha = .1) +
+  geom_smooth(method = "lm") +
+  theme_minimal() +
+  labs(x = "Area Difference (z-scored)",
+       y = "Residuals",
+       title = "Dots",
+       color = "") +
+  scale_color_manual(values = viridisLite::viridis(2, option = "mako", begin = 0, end = 0.8)) +
+  theme(text = element_text(size = 15),
+        legend.position = "bottom") +
+  facet_wrap(~model_type) + 
+  geom_text(data = slopes,
+            aes(x = x, y = y, label = label),
+            hjust = -1,
+            inherit.aes = FALSE,
+            size = 5)
+
+
+
+mdots = lmer(data = df_dots,
+          cosine_similarity ~ area_diff * model_type + numerosity_diff * model_type + 
+            patch_size * numerosity_diff + log_params * numerosity_diff +
+            (1 | image_1) + (1 | image_2) + 
+            (1|model_name))
+
+summary(mdots)
+
+```
