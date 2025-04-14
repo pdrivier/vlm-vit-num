@@ -33,15 +33,13 @@ library(viridis)
 
 library(ggcorrplot)
 
-all_colors <- viridis::viridis(10, option = "mako")
-my_colors <- all_colors[c(5, 7)]  # Selecting specific colors from the palette
 ```
 
 
 # Load data
 
 ```{r}
-# setwd("/Users/seantrott/Dropbox/UCSD/Research/NLMs/vlm-vit-num/analysis")
+setwd("/Users/pamelariviere/Desktop/backburner_projects/projects_sean/vlm-vit-num/analysis")
 directory_path <- "../results"
 csv_files <- list.files(path = directory_path, pattern = "*.csv", full.names = TRUE)
 csv_list <- csv_files %>%
@@ -67,17 +65,20 @@ table(df_hf_models$model_name)
 table(df_hf_models$model_name, df_hf_models$numerosity_comparison_type)
 table(df_hf_models$model_name, df_hf_models$image_type)
 
+## Take a look again at the area differences
+df_hf_models$combined_type <- interaction(df_hf_models$image_type, df_hf_models$model_type, sep = "_")
 
-## Take a look again at the rescaled area differences
-df_hf_models %>% 
+df_hf_models %>%
   ggplot(aes(x = area_diff,
              y = cosine_similarity,
-             color = model_type)) + 
-  geom_point(alpha=0.1) + 
+             color = combined_type)) +
+  geom_point(alpha = 0.1) +
   geom_smooth(method = "lm", se = FALSE) +
   theme_minimal() +
-  scale_color_manual(values = viridisLite::viridis(2, option = "mako", begin = 0, end = 0.8)) +
-  facet_wrap(~model_type) 
+  labs(x = "Area Difference",
+       y = "Cosine Similarity") +
+  scale_color_manual(values = viridisLite::viridis(length(unique(df_hf_models$combined_type)), option = "mako", begin = 0, end = 0.8)) +
+  facet_wrap(~model_type)
 
 ```
 
@@ -146,7 +147,7 @@ df_hf_models %>%
                        alpha = .7, 
                        scale=.85, 
                        # size=1, 
-                       size = 0,
+                       linewidth = 0,
                        stat="density") +
   labs(x = "Cosine Similarity",
        y = "",
@@ -165,6 +166,43 @@ m1 = lmer(data = df_hf_models,
           control=lmerControl(optimizer="bobyqa"))
 
 summary(m1)
+
+## Check that the main effect of numerosity difference (both categorical and continuous 
+# specifications) hold with just dots
+df_dot <- df_hf_models %>%
+  filter(image_type == "dots")
+mdots = lmer(data = df_dot, cosine_similarity ~ area_diff + numerosity_comparison_type + 
+            (1 | image_1) + (1 | image_2) + 
+            (1 |model_name),
+          control=lmerControl(optimizer="bobyqa"))
+
+summary(mdots)
+
+mdots = lmer(data = df_dot, cosine_similarity ~ area_diff + numerosity_diff + 
+            (1 | image_1) + (1 | image_2) + 
+            (1 |model_name),
+          control=lmerControl(optimizer="bobyqa"))
+
+summary(mdots)
+
+## Check that the main effect of numerosity difference (both categorical and continuous 
+# specifications) hold with just rectangles
+df_rect <- df_hf_models %>%
+  filter(image_type == "rectangles")
+
+mrectangles = lmer(data = df_rect, cosine_similarity ~ area_diff + numerosity_comparison_type + 
+            (1 | image_1) + (1 | image_2) + 
+            (1 |model_name),
+          control=lmerControl(optimizer="bobyqa"))
+
+summary(mrectangles)
+
+mrectangles = lmer(data = df_rect, cosine_similarity ~ area_diff + numerosity_diff + 
+            (1 | image_1) + (1 | image_2) + 
+            (1 |model_name),
+          control=lmerControl(optimizer="bobyqa"))
+
+summary(mrectangles)
 
 
 ### Interaction with layer
@@ -593,14 +631,14 @@ df_hf_models %>%
   filter(layer == max_layer) %>%
   ggplot(aes(x = area_diff,
              y = cosine_similarity,
-             color = model_type)) +
+             color = combined_type)) +
   geom_point(alpha = .5) +
   geom_smooth(method = "lm") +
   theme_minimal() +
   labs(x = "Area Difference",
        y = "Cosine Similarity",
        color = "") +
-    scale_color_manual(values = viridisLite::viridis(2, option = "mako", begin = 0, end = 0.8)) +
+    scale_color_manual(values = viridisLite::viridis(4, option = "mako", begin = 0, end = 0.8)) +
   theme(text = element_text(size = 15),
         legend.position = "bottom") +
   facet_wrap(~model_type)
@@ -654,7 +692,7 @@ df_hf_models %>%
             inherit.aes = FALSE,
             size = 5)
 
-m = lmer(data = df_hf_models,
+m = lmer(data = filter(df_hf_models, layer == max_layer),
           cosine_similarity ~ area_diff * model_type + numerosity_diff * model_type + 
             patch_size * numerosity_diff + log_params * numerosity_diff +
             (1 | image_1) + (1 | image_2) + (1 | image_type) + 

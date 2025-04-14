@@ -22,7 +22,7 @@ output:
 
 
 ```r
-# setwd("/Users/seantrott/Dropbox/UCSD/Research/NLMs/vlm-vit-num/analysis")
+setwd("/Users/pamelariviere/Desktop/backburner_projects/projects_sean/vlm-vit-num/analysis")
 directory_path <- "../results"
 csv_files <- list.files(path = directory_path, pattern = "*.csv", full.names = TRUE)
 csv_list <- csv_files %>%
@@ -245,16 +245,20 @@ table(df_hf_models$model_name, df_hf_models$image_type)
 ```
 
 ```r
-## Take a look again at the rescaled area differences
-df_hf_models %>% 
+## Take a look again at the area differences
+df_hf_models$combined_type <- interaction(df_hf_models$image_type, df_hf_models$model_type, sep = "_")
+
+df_hf_models %>%
   ggplot(aes(x = area_diff,
              y = cosine_similarity,
-             color = model_type)) + 
-  geom_point(alpha=0.1) + 
+             color = combined_type)) +
+  geom_point(alpha = 0.1) +
   geom_smooth(method = "lm", se = FALSE) +
   theme_minimal() +
-  scale_color_manual(values = viridisLite::viridis(2, option = "mako", begin = 0, end = 0.8)) +
-  facet_wrap(~model_type) 
+  labs(x = "Area Difference",
+       y = "Cosine Similarity") +
+  scale_color_manual(values = viridisLite::viridis(length(unique(df_hf_models$combined_type)), option = "mako", begin = 0, end = 0.8)) +
+  facet_wrap(~model_type)
 ```
 
 ```
@@ -346,7 +350,7 @@ df_hf_models %>%
                        alpha = .7, 
                        scale=.85, 
                        # size=1, 
-                       size = 0,
+                       linewidth = 0,
                        stat="density") +
   labs(x = "Cosine Similarity",
        y = "",
@@ -356,11 +360,6 @@ df_hf_models %>%
   theme(text = element_text(size = 15),
         legend.position="bottom") +
   facet_wrap(~image_type)
-```
-
-```
-## Warning in geom_density_ridges2(aes(height = ..density..), color = gray(0.25),
-## : Ignoring unknown parameters: `size`
 ```
 
 ```
@@ -424,6 +423,203 @@ summary(m1)
 ##             (Intr) ar_dff
 ## area_diff   -0.046       
 ## nmrsty_cmp_ -0.046  0.210
+```
+
+```r
+## Check that the main effect of numerosity difference (both categorical and continuous 
+# specifications) hold with just dots
+df_dot <- df_hf_models %>%
+  filter(image_type == "dots")
+mdots = lmer(data = df_dot, cosine_similarity ~ area_diff + numerosity_comparison_type + 
+            (1 | image_1) + (1 | image_2) + 
+            (1 |model_name),
+          control=lmerControl(optimizer="bobyqa"))
+
+summary(mdots)
+```
+
+```
+## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+## lmerModLmerTest]
+## Formula: cosine_similarity ~ area_diff + numerosity_comparison_type +  
+##     (1 | image_1) + (1 | image_2) + (1 | model_name)
+##    Data: df_dot
+## Control: lmerControl(optimizer = "bobyqa")
+## 
+## REML criterion at convergence: -262476.7
+## 
+## Scaled residuals: 
+##      Min       1Q   Median       3Q      Max 
+## -11.2568  -0.3921   0.1600   0.6119   2.6736 
+## 
+## Random effects:
+##  Groups     Name        Variance  Std.Dev.
+##  image_1    (Intercept) 4.756e-05 0.006896
+##  image_2    (Intercept) 5.121e-05 0.007156
+##  model_name (Intercept) 8.226e-05 0.009070
+##  Residual               1.119e-03 0.033451
+## Number of obs: 66820, groups:  image_1, 957; image_2, 886; model_name, 9
+## 
+## Fixed effects:
+##                                  Estimate Std. Error         df t value
+## (Intercept)                     9.755e-01  3.086e-03  8.423e+00  316.15
+## area_diff                      -6.608e-06  4.104e-07  1.467e+03  -16.10
+## numerosity_comparison_typesame  6.281e-03  4.708e-04  2.308e+03   13.34
+##                                Pr(>|t|)    
+## (Intercept)                      <2e-16 ***
+## area_diff                        <2e-16 ***
+## numerosity_comparison_typesame   <2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Correlation of Fixed Effects:
+##             (Intr) ar_dff
+## area_diff   -0.133       
+## nmrsty_cmp_ -0.112  0.268
+```
+
+```r
+mdots = lmer(data = df_dot, cosine_similarity ~ area_diff + numerosity_diff + 
+            (1 | image_1) + (1 | image_2) + 
+            (1 |model_name),
+          control=lmerControl(optimizer="bobyqa"))
+
+summary(mdots)
+```
+
+```
+## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+## lmerModLmerTest]
+## Formula: cosine_similarity ~ area_diff + numerosity_diff + (1 | image_1) +  
+##     (1 | image_2) + (1 | model_name)
+##    Data: df_dot
+## Control: lmerControl(optimizer = "bobyqa")
+## 
+## REML criterion at convergence: -262678.7
+## 
+## Scaled residuals: 
+##      Min       1Q   Median       3Q      Max 
+## -11.2380  -0.3909   0.1569   0.6112   2.6771 
+## 
+## Random effects:
+##  Groups     Name        Variance  Std.Dev.
+##  image_1    (Intercept) 4.037e-05 0.006354
+##  image_2    (Intercept) 4.266e-05 0.006531
+##  model_name (Intercept) 8.373e-05 0.009151
+##  Residual               1.118e-03 0.033438
+## Number of obs: 66820, groups:  image_1, 957; image_2, 886; model_name, 9
+## 
+## Fixed effects:
+##                   Estimate Std. Error         df t value Pr(>|t|)    
+## (Intercept)      9.808e-01  3.088e-03  8.188e+00  317.63   <2e-16 ***
+## area_diff       -4.747e-06  4.076e-07  1.551e+03  -11.65   <2e-16 ***
+## numerosity_diff -9.314e-04  4.589e-05  2.247e+03  -20.30   <2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Correlation of Fixed Effects:
+##             (Intr) ar_dff
+## area_diff   -0.088       
+## numrsty_dff -0.012 -0.400
+```
+
+```r
+## Check that the main effect of numerosity difference (both categorical and continuous 
+# specifications) hold with just rectangles
+df_rect <- df_hf_models %>%
+  filter(image_type == "rectangles")
+
+mrectangles = lmer(data = df_rect, cosine_similarity ~ area_diff + numerosity_comparison_type + 
+            (1 | image_1) + (1 | image_2) + 
+            (1 |model_name),
+          control=lmerControl(optimizer="bobyqa"))
+
+summary(mrectangles)
+```
+
+```
+## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+## lmerModLmerTest]
+## Formula: cosine_similarity ~ area_diff + numerosity_comparison_type +  
+##     (1 | image_1) + (1 | image_2) + (1 | model_name)
+##    Data: df_rect
+## Control: lmerControl(optimizer = "bobyqa")
+## 
+## REML criterion at convergence: -423771.6
+## 
+## Scaled residuals: 
+##     Min      1Q  Median      3Q     Max 
+## -7.9478 -0.3304  0.1123  0.5340  3.4596 
+## 
+## Random effects:
+##  Groups     Name        Variance  Std.Dev.
+##  image_1    (Intercept) 0.0008681 0.02946 
+##  image_2    (Intercept) 0.0007955 0.02820 
+##  model_name (Intercept) 0.0003614 0.01901 
+##  Residual               0.0043749 0.06614 
+## Number of obs: 164480, groups:  image_1, 464; image_2, 440; model_name, 9
+## 
+## Fixed effects:
+##                                  Estimate Std. Error         df t value
+## (Intercept)                     9.598e-01  6.930e-03  1.142e+01  138.50
+## area_diff                      -2.613e-04  1.988e-05  6.353e+02  -13.14
+## numerosity_comparison_typesame  2.877e-02  1.713e-03  6.835e+02   16.80
+##                                Pr(>|t|)    
+## (Intercept)                      <2e-16 ***
+## area_diff                        <2e-16 ***
+## numerosity_comparison_typesame   <2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Correlation of Fixed Effects:
+##             (Intr) ar_dff
+## area_diff   -0.253       
+## nmrsty_cmp_ -0.150  0.035
+```
+
+```r
+mrectangles = lmer(data = df_rect, cosine_similarity ~ area_diff + numerosity_diff + 
+            (1 | image_1) + (1 | image_2) + 
+            (1 |model_name),
+          control=lmerControl(optimizer="bobyqa"))
+
+summary(mrectangles)
+```
+
+```
+## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+## lmerModLmerTest]
+## Formula: cosine_similarity ~ area_diff + numerosity_diff + (1 | image_1) +  
+##     (1 | image_2) + (1 | model_name)
+##    Data: df_rect
+## Control: lmerControl(optimizer = "bobyqa")
+## 
+## REML criterion at convergence: -424081.8
+## 
+## Scaled residuals: 
+##     Min      1Q  Median      3Q     Max 
+## -7.9431 -0.3306  0.1121  0.5340  3.4504 
+## 
+## Random effects:
+##  Groups     Name        Variance  Std.Dev.
+##  image_1    (Intercept) 0.0005179 0.02276 
+##  image_2    (Intercept) 0.0004868 0.02206 
+##  model_name (Intercept) 0.0003614 0.01901 
+##  Residual               0.0043748 0.06614 
+## Number of obs: 164480, groups:  image_1, 464; image_2, 440; model_name, 9
+## 
+## Fixed effects:
+##                   Estimate Std. Error         df t value Pr(>|t|)    
+## (Intercept)      9.902e-01  6.673e-03  9.816e+00  148.39   <2e-16 ***
+## area_diff       -2.667e-04  1.569e-05  6.584e+02  -17.00   <2e-16 ***
+## numerosity_diff -2.819e-03  9.701e-05  6.914e+02  -29.06   <2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Correlation of Fixed Effects:
+##             (Intr) ar_dff
+## area_diff   -0.202       
+## numrsty_dff -0.067 -0.015
 ```
 
 ```r
@@ -1863,14 +2059,14 @@ df_hf_models %>%
   filter(layer == max_layer) %>%
   ggplot(aes(x = area_diff,
              y = cosine_similarity,
-             color = model_type)) +
+             color = combined_type)) +
   geom_point(alpha = .5) +
   geom_smooth(method = "lm") +
   theme_minimal() +
   labs(x = "Area Difference",
        y = "Cosine Similarity",
        color = "") +
-    scale_color_manual(values = viridisLite::viridis(2, option = "mako", begin = 0, end = 0.8)) +
+    scale_color_manual(values = viridisLite::viridis(4, option = "mako", begin = 0, end = 0.8)) +
   theme(text = element_text(size = 15),
         legend.position = "bottom") +
   facet_wrap(~model_type)
@@ -1939,7 +2135,7 @@ df_hf_models %>%
 ![](cd_analysis_files/figure-html/unnamed-chunk-11-2.png)<!-- -->
 
 ```r
-m = lmer(data = df_hf_models,
+m = lmer(data = filter(df_hf_models, layer == max_layer),
           cosine_similarity ~ area_diff * model_type + numerosity_diff * model_type + 
             patch_size * numerosity_diff + log_params * numerosity_diff +
             (1 | image_1) + (1 | image_2) + (1 | image_type) + 
@@ -1965,61 +2161,61 @@ summary(m)
 ##     model_type + patch_size * numerosity_diff + log_params *  
 ##     numerosity_diff + (1 | image_1) + (1 | image_2) + (1 | image_type) +  
 ##     (1 | model_name)
-##    Data: df_hf_models
+##    Data: filter(df_hf_models, layer == max_layer)
 ## 
-## REML criterion at convergence: -649777.5
+## REML criterion at convergence: -22402.4
 ## 
 ## Scaled residuals: 
 ##     Min      1Q  Median      3Q     Max 
-## -9.1083 -0.3085  0.1044  0.5015  3.8865 
+## -6.0044 -0.3755  0.0581  0.4949  3.1493 
 ## 
 ## Random effects:
 ##  Groups     Name        Variance  Std.Dev.
-##  image_1    (Intercept) 0.0003343 0.01828 
-##  image_2    (Intercept) 0.0003391 0.01841 
-##  model_name (Intercept) 0.0002303 0.01517 
-##  image_type (Intercept) 0.0001498 0.01224 
-##  Residual               0.0034487 0.05873 
-## Number of obs: 231300, groups:  
+##  image_1    (Intercept) 0.0022289 0.04721 
+##  image_2    (Intercept) 0.0023297 0.04827 
+##  model_name (Intercept) 0.0009963 0.03156 
+##  image_type (Intercept) 0.0012337 0.03512 
+##  Residual               0.0023438 0.04841 
+## Number of obs: 8100, groups:  
 ## image_1, 1412; image_2, 1318; model_name, 9; image_type, 2
 ## 
 ## Fixed effects:
 ##                                 Estimate Std. Error         df t value Pr(>|t|)
-## (Intercept)                    1.207e+00  1.385e-01  5.036e+00   8.714 0.000318
-## area_diff                     -5.000e-06  1.121e-06  2.811e+03  -4.462 8.46e-06
-## model_typeVLM                  7.652e-03  1.192e-02  5.009e+00   0.642 0.549085
-## numerosity_diff                7.256e-03  5.442e-04  2.148e+05  13.333  < 2e-16
-## patch_size                    -2.865e-05  8.059e-04  5.009e+00  -0.036 0.973015
-## log_params                    -2.747e-02  1.537e-02  4.995e+00  -1.787 0.134033
-## area_diff:model_typeVLM        8.844e-06  1.420e-06  2.701e+03   6.226 5.52e-10
-## model_typeVLM:numerosity_diff  4.999e-04  4.630e-05  2.164e+05  10.796  < 2e-16
-## numerosity_diff:patch_size    -1.589e-05  3.191e-06  2.312e+05  -4.978 6.42e-07
-## numerosity_diff:log_params    -1.073e-03  6.004e-05  2.226e+05 -17.863  < 2e-16
+## (Intercept)                    1.138e+00  2.890e-01  5.090e+00   3.937 0.010614
+## area_diff                     -1.119e-05  3.342e-06  3.180e+03  -3.349 0.000821
+## model_typeVLM                  4.039e-03  2.484e-02  5.023e+00   0.163 0.877154
+## numerosity_diff               -6.662e-03  2.105e-03  6.830e+03  -3.165 0.001558
+## patch_size                    -1.304e-03  1.679e-03  5.011e+00  -0.777 0.472269
+## log_params                    -2.352e-02  3.203e-02  5.017e+00  -0.734 0.495577
+## area_diff:model_typeVLM        2.051e-06  4.219e-06  2.762e+03   0.486 0.626890
+## model_typeVLM:numerosity_diff -7.682e-04  1.832e-04  6.880e+03  -4.193 2.79e-05
+## numerosity_diff:patch_size    -4.463e-05  1.194e-05  6.527e+03  -3.737 0.000188
+## numerosity_diff:log_params     2.310e-04  2.342e-04  6.792e+03   0.986 0.324042
 ##                                  
-## (Intercept)                   ***
+## (Intercept)                   *  
 ## area_diff                     ***
 ## model_typeVLM                    
-## numerosity_diff               ***
+## numerosity_diff               ** 
 ## patch_size                       
 ## log_params                       
-## area_diff:model_typeVLM       ***
+## area_diff:model_typeVLM          
 ## model_typeVLM:numerosity_diff ***
 ## numerosity_diff:patch_size    ***
-## numerosity_diff:log_params    ***
+## numerosity_diff:log_params       
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Correlation of Fixed Effects:
 ##               (Intr) ar_dff md_VLM nmrst_ ptch_s lg_prm a_:_VL m_VLM:
-## area_diff     -0.002                                                 
-## modl_typVLM    0.457  0.007                                          
-## numrsty_dff   -0.022 -0.028 -0.010                                   
-## patch_size    -0.576  0.000 -0.154  0.012                            
-## log_params    -0.992  0.000 -0.507  0.022  0.495                     
-## ar_dff:_VLM    0.001 -0.542 -0.012 -0.009 -0.001  0.000              
-## mdl_tyVLM:_   -0.011  0.026 -0.022  0.478  0.001  0.012 -0.033       
-## nmrsty_dff:p_  0.012 -0.001  0.001 -0.531 -0.021 -0.010  0.002 -0.024
-## nmrsty_dff:l_  0.022  0.002  0.012 -0.987 -0.010 -0.022  0.010 -0.540
+## area_diff     -0.004                                                 
+## modl_typVLM    0.456  0.012                                          
+## numrsty_dff   -0.040 -0.011 -0.018                                   
+## patch_size    -0.575  0.001 -0.154  0.022                            
+## log_params    -0.990  0.000 -0.507  0.040  0.495                     
+## ar_dff:_VLM    0.001 -0.555 -0.021 -0.009 -0.001  0.000              
+## mdl_tyVLM:_   -0.019  0.032 -0.041  0.454  0.006  0.020 -0.039       
+## nmrsty_dff:p_  0.023 -0.007  0.006 -0.569 -0.039 -0.020  0.005 -0.158
+## nmrsty_dff:l_  0.040 -0.008  0.020 -0.991 -0.019 -0.041  0.010 -0.502
 ##               nmrsty_dff:p_
 ## area_diff                  
 ## modl_typVLM                
@@ -2029,7 +2225,7 @@ summary(m)
 ## ar_dff:_VLM                
 ## mdl_tyVLM:_                
 ## nmrsty_dff:p_              
-## nmrsty_dff:l_  0.446       
+## nmrsty_dff:l_  0.490       
 ## fit warnings:
 ## Some predictor variables are on very different scales: consider rescaling
 ```
